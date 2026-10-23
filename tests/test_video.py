@@ -1,10 +1,11 @@
 import inspect
 from pathlib import Path
 
+import cv2
 import pytest
 
 from ace.domain import VideoInfo
-from ace.video import iter_frames, parse_ffprobe, probe
+from ace.video import iter_frames, parse_ffprobe, probe, rotate_code
 
 REAL = Path("videos/IMG_2665.mov")
 needs_real = pytest.mark.skipif(not REAL.exists(), reason="sample video missing")
@@ -45,3 +46,10 @@ def test_iter_frames_upright_and_lazy():
     assert inspect.isgenerator(frames)
     _, img = next(frames)
     assert img.shape == (1986, 1116, 3)
+
+
+def test_rotate_code_mapping():
+    assert rotate_code(0) is None
+    assert rotate_code(-90) == rotate_code(270) == cv2.ROTATE_90_CLOCKWISE
+    assert rotate_code(90) == cv2.ROTATE_90_COUNTERCLOCKWISE
+    assert rotate_code(180) == cv2.ROTATE_180

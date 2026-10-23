@@ -9,9 +9,11 @@ import numpy as np
 
 from ace.domain import VideoInfo
 
-_ROTATE = {90: cv2.ROTATE_90_CLOCKWISE, -90: cv2.ROTATE_90_COUNTERCLOCKWISE,
-           270: cv2.ROTATE_90_COUNTERCLOCKWISE, -270: cv2.ROTATE_90_CLOCKWISE,
-           180: cv2.ROTATE_180, -180: cv2.ROTATE_180}
+def rotate_code(rotation: int) -> int | None:
+    """cv2.rotate code that uprights a frame; ffprobe rotation is the counter-clockwise display angle."""
+    return {-90: cv2.ROTATE_90_CLOCKWISE, 270: cv2.ROTATE_90_CLOCKWISE,
+            90: cv2.ROTATE_90_COUNTERCLOCKWISE, -270: cv2.ROTATE_90_COUNTERCLOCKWISE,
+            180: cv2.ROTATE_180, -180: cv2.ROTATE_180}.get(rotation)
 
 
 def parse_ffprobe(d: dict) -> VideoInfo:
@@ -40,15 +42,17 @@ def iter_frames(path: Path) -> Iterator[tuple[int, np.ndarray]]:
     """Yield (index, upright BGR frame) lazily; never holds the whole video."""
     info = probe(path)
     cap = cv2.VideoCapture(str(path))
+    cap.set(cv2.CAP_PROP_ORIENTATION_AUTO, 1)
+    # rotate by hand only if this OpenCV build did not apply the display matrix itself
+    manual = rotate_code(info.rotation) if not cap.get(cv2.CAP_PROP_ORIENTATION_AUTO) else None
     try:
         i = 0
         while True:
             ok, img = cap.read()
             if not ok:
                 return
-            # OpenCV usually applies the display matrix itself; fix up only if it did not.
-            if img.shape[:2] != (info.height, info.width) and info.rotation in _ROTATE:
-                img = cv2.rotate(img, _ROTATE[info.rotation])
+            if manual is not None:
+                img = cv2.rotate(img, manual)
             yield i, img
             i += 1
     finally:
