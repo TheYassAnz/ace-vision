@@ -15,8 +15,18 @@ def _root() -> Path:
     return Path(os.environ.get("ACE_DATA_DIR") or DATA_DIR)
 
 
+ID_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9a-z-]+")
+VIDEO_EXTS = {".mov", ".mp4", ".m4v"}
+
+
 def match_dir(id: str) -> Path:
-    return _root() / "matchs" / id
+    if not ID_RE.fullmatch(id):
+        raise ValueError(f"identifiant de match invalide : {id!r}")
+    base = (_root() / "matchs").resolve()
+    d = (base / id).resolve()
+    if not d.is_relative_to(base):
+        raise ValueError(f"identifiant de match invalide : {id!r}")
+    return d
 
 
 def pose_path(id: str) -> Path:
@@ -54,7 +64,10 @@ def save_settings(s: Settings) -> None:
 
 def create_match(src: BinaryIO, filename: str, view: View, title: str) -> Match:
     """Stream the upload to disk, probe it, and (re)create the match; a re-import resets the analysis."""
-    name = Path(filename).name
+    ext = Path(filename).suffix.lower()
+    if ext not in VIDEO_EXTS:
+        raise ValueError("Format de vidéo non pris en charge (.mov, .mp4, .m4v).")
+    name = "video" + ext  # never the raw upload name
     tmp_dir = _root() / "incoming"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     tmp = tmp_dir / name
@@ -62,8 +75,10 @@ def create_match(src: BinaryIO, filename: str, view: View, title: str) -> Match:
         shutil.copyfileobj(src, out, 1024 * 1024)
     try:
         info = probe(tmp)
-        slug = re.sub(r"[^a-z0-9]+", "-", Path(name).stem.lower()).strip("-") or "match"
-        id = f"{(info.created or date.today().isoformat())[:10]}-{slug}"
+        created = (info.created or "")[:10]
+        day = created if re.fullmatch(r"\d{4}-\d{2}-\d{2}", created) else date.today().isoformat()
+        slug = re.sub(r"[^0-9a-z]+", "-", Path(filename).stem.lower()).strip("-") or "match"
+        id = f"{day}-{slug}"
         match_dir(id).mkdir(parents=True, exist_ok=True)
         shutil.move(tmp, match_dir(id) / name)
     finally:

@@ -51,3 +51,19 @@ def test_large_upload_streamed():
             return super().read(n)
 
     store.create_match(Src(b"x" * 100), "big.mov", "rear", "")
+
+
+def test_untrusted_inputs_stay_inside_data_dir(tmp_path, monkeypatch):
+    base = store.probe
+    monkeypatch.setattr(store, "probe", lambda p: base(p).model_copy(update={"created": "../../etc"}))
+    m = store.create_match(io.BytesIO(b"x"), "../../evil.mov", "net", "")
+    assert store.ID_RE.fullmatch(m.id) and m.id.endswith("-evil")
+    assert m.video_file == "video.mov"
+    assert store.match_dir(m.id).is_relative_to(tmp_path.resolve())
+    assert not (tmp_path.parent.parent / "evil.mov").exists()
+
+
+def test_load_rejects_traversal():
+    for bad in ("../x", "..", "2026-03-04-../x"):
+        with pytest.raises(ValueError):
+            store.load(bad)
