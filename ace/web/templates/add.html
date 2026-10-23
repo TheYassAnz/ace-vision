@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Ajouter un match — Ace Vision{% endblock %}
+{% block content %}
+<h1>Ajouter un match</h1>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form method="post" action="/matchs" enctype="multipart/form-data">
+<label>Vidéo (.mov, .mp4, .m4v) <input type="file" name="video" accept=".mov,.mp4,.m4v,video/*" required></label>
+<fieldset>
+<label><input type="radio" name="view" value="net" required> Vue filet</label>
+<label><input type="radio" name="view" value="rear"> Vue arrière</label>
+</fieldset>
+<label>Titre (facultatif) <input type="text" name="title" placeholder="vs Karim"></label>
+<p><button type="submit">Analyser</button></p>
+</form>
+{% endblock %}

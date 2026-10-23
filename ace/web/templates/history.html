@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Historique — Ace Vision{% endblock %}
+{% block content %}
+<h1>Historique</h1>
+{% if not matches %}<p>Aucun match pour le moment. <a href="/ajouter">Ajouter un match</a></p>{% else %}
+<table>
+<tr><th>Date</th><th>Durée</th><th>Vue</th><th>Titre</th><th>Statut</th><th>Résultats</th></tr>
+{% for m in matches %}
+<tr>
+<td>{{ m.id[:10] }}</td>
+<td>{% if m.info %}{{ (m.info.duration_s // 60)|int }} min {{ (m.info.duration_s % 60)|int }} s{% endif %}</td>
+<td>{{ view_labels[m.view] }}</td>
+<td><a href="/matchs/{{ m.id }}">{{ m.title or m.id }}</a></td>
+<td>{{ status_labels[m.status] }}</td>
+<td>{% if m.status == "done" %}{{ m.strokes|length }} coups, {{ m.findings|length }} constats{% endif %}</td>
+</tr>
+{% endfor %}
+</table>
+{% endif %}
+{% endblock %}

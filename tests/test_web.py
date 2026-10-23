@@ -1,0 +1,113 @@
+import io
+
+import pytest
+from fastapi.testclient import TestClient
+
+from ace import __main__ as entry
+from ace import store
+from ace.domain import VideoInfo
+from ace.jobs import runner
+from ace.web.app import app
+
+
+@pytest.fixture(autouse=True)
+def env(tmp_path, monkeypatch):
+    monkeypatch.setenv("ACE_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(store, "probe", lambda p: VideoInfo(
+        width=1116, height=1986, fps=30, duration_s=75, n_frames=30, rotation=-90, created="2026-03-04T10:00:00"))
+    monkeypatch.setattr(runner, "start", lambda mid: True)
+
+
+client = TestClient(app)
+
+
+def make(title="vs Karim", data=b"x" * 1000):
+    return store.create_match(io.BytesIO(data), "IMG_1.mov", "net", title)
+
+
+def test_upload_creates_match_and_redirects(monkeypatch):
+    started = []
+    monkeypatch.setattr(runner, "start", lambda mid: started.append(mid) or True)
+    r = client.post("/matchs", files={"video": ("IMG_2665.mov", b"abc", "video/quicktime")},
+                    data={"view": "net", "title": "vs Karim"}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/matchs/2026-03-04-img-2665"
+    assert (store.match_dir("2026-03-04-img-2665") / "match.json").exists()
+    assert started == ["2026-03-04-img-2665"]
+
+
+def test_upload_while_busy_says_so(monkeypatch):
+    monkeypatch.setattr(runner, "start", lambda mid: False)
+    r = client.post("/matchs", files={"video": ("a.mov", b"abc", "video/quicktime")}, data={"view": "net"})
+    assert "Une analyse est déjà en cours. Celle-ci démarrera quand tu cliqueras sur Relancer." in r.text
+
+
+def test_upload_bad_extension_shows_message():
+    r = client.post("/matchs", files={"video": ("a.txt", b"abc", "text/plain")}, data={"view": "net"})
+    assert r.status_code == 200 and "Format de vidéo non pris en charge" in r.text
+
+
+def test_history_lists_title():
+    make()
+    r = client.get("/")
+    assert "vs Karim" in r.text and "Vue filet" in r.text and '<html lang="fr">' in r.text
+
+
+def test_status_json():
+    m = make()
+    assert client.get(f"/matchs/{m.id}/statut").json() == {"status": "pending", "progress": 0.0, "error": None}
+
+
+def test_failed_page_has_relaunch_button():
+    m = make()
+    m.status, m.error = "failed", "boom"
+    store.save(m)
+    r = client.get(f"/matchs/{m.id}")
+    assert "Relancer" in r.text and "boom" in r.text
+
+
+def test_running_and_done_pages():
+    m = make()
+    m.status = "running"
+    store.save(m)
+    assert "Analyse en cours" in client.get(f"/matchs/{m.id}").text
+    m.status = "done"
+    store.save(m)
+    assert "Bilan disponible bientôt" in client.get(f"/matchs/{m.id}").text
+
+
+def test_relaunch_redirects(monkeypatch):
+    m = make()
+    started = []
+    monkeypatch.setattr(runner, "start", lambda mid: started.append(mid) or True)
+    r = client.post(f"/matchs/{m.id}/relancer", follow_redirects=False)
+    assert r.status_code == 303 and started == [m.id]
+
+
+def test_settings_roundtrip():
+    r = client.post("/reglages", data={"handedness": "left", "backhand_hands": "1"}, follow_redirects=False)
+    assert r.status_code == 303
+    s = store.load_settings()
+    assert s.handedness == "left" and s.backhand_hands == 1
+    assert client.get("/reglages").status_code == 200
+
+
+def test_video_range_request():
+    m = make(data=bytes(range(256)) * 4)
+    r = client.get(f"/matchs/{m.id}/video", headers={"Range": "bytes=0-99"})
+    assert r.status_code == 206 and len(r.content) == 100
+    assert r.headers["content-range"] == "bytes 0-99/1024" and r.headers["accept-ranges"] == "bytes"
+    assert r.headers["content-type"] == "video/quicktime"
+
+
+def test_invalid_or_unknown_id_is_404():
+    for path in ("/matchs/..%2Fx", "/matchs/nope", "/matchs/2026-01-01-zz", "/matchs/nope/video", "/matchs/nope/statut"):
+        assert client.get(path).status_code == 404
+    assert client.post("/matchs/nope/relancer").status_code == 404
+
+
+def test_server_binds_localhost(monkeypatch):
+    calls = []
+    monkeypatch.setattr(entry.uvicorn, "run", lambda *a, **k: calls.append(k))
+    monkeypatch.setattr(entry, "recover_interrupted", lambda: calls.append("recovered"))
+    entry.main()
+    assert calls[0] == "recovered" and calls[1]["host"] == "127.0.0.1"

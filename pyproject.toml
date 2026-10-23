@@ -15,7 +15,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest", "httpx"]
+dev = [
+    "pytest",
+    "httpx",
+    "httpx2>=2.16.0",
+]
 
 [tool.pytest.ini_options]
 markers = ["slow: vraies vidéos/modèles"]

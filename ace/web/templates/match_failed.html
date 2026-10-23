@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ m.title or m.id }} — Ace Vision{% endblock %}
+{% block content %}
+<h1>{{ m.title or m.id }}</h1>
+{% if queued_msg %}<p class="notice">{{ queued_msg }}</p>{% endif %}
+{% if m.status == "failed" %}<p class="error">L'analyse a échoué{% if m.error %} : {{ m.error }}{% endif %}</p>
+{% else %}<p>Ce match n'a pas encore été analysé.</p>{% endif %}
+<form method="post" action="/matchs/{{ m.id }}/relancer"><button type="submit">Relancer</button></form>
+{% endblock %}
