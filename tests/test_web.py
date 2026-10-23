@@ -18,7 +18,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(runner, "start", lambda mid: True)
 
 
-client = TestClient(app)
+client = TestClient(app, base_url="http://127.0.0.1:8765", headers={"Origin": "http://127.0.0.1:8765"})
 
 
 def make(title="vs Karim", data=b"x" * 1000):
@@ -111,3 +111,36 @@ def test_server_binds_localhost(monkeypatch):
     monkeypatch.setattr(entry, "recover_interrupted", lambda: calls.append("recovered"))
     entry.main()
     assert calls[0] == "recovered" and calls[1]["host"] == "127.0.0.1"
+
+
+def test_cross_origin_post_is_refused():
+    for headers in ({"Origin": "http://evil.example"}, {"Origin": "", "Referer": "http://evil.example/"}, {"Origin": ""}):
+        assert client.post("/reglages", data={"handedness": "left", "backhand_hands": "1"}, headers=headers).status_code == 403
+    assert not (store._root() / "settings.json").exists()
+    ok = client.post("/reglages", data={"handedness": "left", "backhand_hands": "1"},
+                     headers={"Origin": "", "Referer": "http://localhost:8765/reglages"}, follow_redirects=False)
+    assert ok.status_code == 303
+
+
+def test_foreign_host_is_refused():
+    assert client.get("/", headers={"Host": "evil.example"}).status_code == 400
+
+
+def test_unreadable_video_shows_message(monkeypatch):
+    def boom(p):
+        raise RuntimeError("ffprobe failed")
+    monkeypatch.setattr(store, "probe", boom)
+    r = client.post("/matchs", files={"video": ("a.mov", b"garbage", "video/quicktime")}, data={"view": "net"})
+    assert r.status_code == 200 and "Ce fichier n'est pas une vidéo lisible." in r.text
+
+
+def test_relaunch_while_busy_says_so(monkeypatch):
+    m = make()
+    monkeypatch.setattr(runner, "start", lambda mid: False)
+    r = client.post(f"/matchs/{m.id}/relancer", follow_redirects=False)
+    assert r.headers["location"] == f"/matchs/{m.id}?attente=1"
+
+
+def test_title_is_escaped():
+    make(title="<script>x</script>")
+    assert "<script>x</script>" not in client.get("/").text

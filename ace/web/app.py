@@ -3,6 +3,7 @@ from typing import Literal
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -12,6 +13,19 @@ from ace.jobs import runner
 
 HERE = Path(__file__).parent
 app = FastAPI()
+ORIGINS = ("http://127.0.0.1:8765", "http://localhost:8765")
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])  # DNS rebinding
+
+
+@app.middleware("http")
+async def same_origin_only(request: Request, call_next):  # CSRF: browsers always send Origin/Referer on cross-site POSTs
+    if request.method not in ("GET", "HEAD"):
+        src = request.headers.get("origin") or request.headers.get("referer") or ""
+        if not any(src == o or src.startswith(o + "/") for o in ORIGINS):
+            return JSONResponse({"detail": "Origine refusée."}, status_code=403)
+    return await call_next(request)
+
+
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 VIEW_LABELS = {"net": "Vue filet", "rear": "Vue arrière"}
@@ -26,7 +40,7 @@ def render(request: Request, name: str, **ctx):
 def get_match(id: str) -> Match:
     try:
         return store.load(id)
-    except (ValueError, OSError):  # invalid id or no such match
+    except (ValueError, FileNotFoundError):  # invalid id or no such match
         raise HTTPException(404, "Match introuvable.")
 
 
@@ -50,6 +64,8 @@ def create(request: Request, video: UploadFile = File(...), view: Literal["net",
         m = store.create_match(video.file, video.filename or "", view, title.strip())
     except ValueError as e:
         return render(request, "add.html", error=str(e))
+    except Exception:  # probe/ffprobe failure on a corrupt or non-video file
+        return render(request, "add.html", error="Ce fichier n'est pas une vidéo lisible.")
     if not runner.start(m.id):
         return RedirectResponse(f"/matchs/{m.id}?attente=1", status_code=303)
     return see(m.id)
@@ -72,7 +88,8 @@ def status(id: str):
 @app.post("/matchs/{id}/relancer")
 def relaunch(id: str):
     m = get_match(id)
-    runner.start(m.id)
+    if not runner.start(m.id):
+        return RedirectResponse(f"/matchs/{m.id}?attente=1", status_code=303)
     return see(m.id)
 
 

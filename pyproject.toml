@@ -18,11 +18,11 @@ dependencies = [
 dev = [
     "pytest",
     "httpx",
-    "httpx2>=2.16.0",
 ]
 
 [tool.pytest.ini_options]
 markers = ["slow: vraies vidéos/modèles"]
 pythonpath = ["."]
 addopts = "-m 'not slow'"
+filterwarnings = ["error", "ignore:Using `httpx` with `starlette.testclient` is deprecated"]
 
