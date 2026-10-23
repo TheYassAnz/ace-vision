@@ -10,20 +10,8 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run as a plain script from anywhere
 
 from ace import store
-from ace.notes import Note, score_detection
+from ace.notes import NOTE_MERGE_S, match_notes, merge_notes, score_detection
 from ace.strokes import detect_strokes
-
-TOL_S = 0.3  # same tolerance as score_detection
-MERGE_S = 0.3  # two notes closer than this are one stroke typed twice
-
-
-def merge_notes(notes: list[Note]) -> list[Note]:
-    out: list[Note] = []
-    for n in sorted(notes, key=lambda n: n.t):
-        if out and n.t - out[-1].t < MERGE_S:
-            continue
-        out.append(n)
-    return out
 
 
 def main(match_id: str) -> None:
@@ -35,14 +23,8 @@ def main(match_id: str) -> None:
     strokes = detect_strokes(kp, m.info.fps, settings)
     print(f"match {match_id} — {settings.handedness}, revers à {settings.backhand_hands} main(s), {m.info.fps:g} i/s")
     if len(notes) < len(raw):
-        print(f"{len(raw) - len(notes)} note(s) fusionnée(s) (moins de {MERGE_S} s d'écart) : {len(raw)} -> {len(notes)}")
-    # same greedy matching as score_detection: closest note/stroke pairs first
-    pairs = sorted((abs(n.t - s.t), i, j) for i, n in enumerate(notes) for j, s in enumerate(strokes)
-                   if abs(n.t - s.t) <= TOL_S)
-    match: dict[int, int] = {}
-    for _, i, j in pairs:
-        if i not in match and j not in match.values():
-            match[i] = j
+        print(f"{len(raw) - len(notes)} note(s) fusionnée(s) (moins de {NOTE_MERGE_S} s d'écart) : {len(raw)} -> {len(notes)}")
+    match = match_notes(strokes, notes)
     used = set(match.values())
     print(f"{'note t':>7} {'note':<9} {'détect t':>8} {'détecté':<9} {'écart':>6}  résultat")
     for i, n in enumerate(notes):
@@ -55,7 +37,7 @@ def main(match_id: str) -> None:
     for j, s in enumerate(strokes):
         if j not in used:
             print(f"{'':>7} {'':<9} {s.t:8.2f} {s.kind:<9} {'':>6}  fausse frappe")
-    sc = score_detection(strokes, notes)
+    sc = score_detection(strokes, raw)
     print(f"Score : trouvés {sc.n_detected}/{sc.n_notes} ({sc.found_rate:.0%}), bien classés {sc.class_rate:.0%}, "
           f"fausses frappes {sc.false_hits}")
 

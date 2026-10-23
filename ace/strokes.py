@@ -6,6 +6,7 @@ from ace.geometry import L_HIP, L_SH, L_WR, NOSE, R_HIP, R_SH, R_WR, torso_lengt
 
 HIT_MIN_SPEED = 6.0  # torso lengths / s; IMG_2665 scores the same from 5 to 8 (calibrated Task 12)
 MIN_HIT_GAP_S = 1.2  # a backswing can peak ~0.85 s before its impact (IMG_2665); find_peaks keeps the stronger
+# shortcut: strokes closer than 1.2 s merge (fast volley exchanges), revisit with rear-view data
 
 
 def _dominant_wrist(settings: Settings) -> int:
@@ -30,6 +31,8 @@ BACKSWING_START_S, BACKSWING_END_S = 0.6, 0.1  # side read before impact: at imp
 MIN_VALID_SHARE = 0.5  # of backswing frames with wrist and hips seen
 OVERHEAD_BEFORE_S, OVERHEAD_AFTER_S = 0.15, 0.1  # around impact, racket wrist above the head
 TOSS_WINDOW_S = 1.5  # free wrist above the head before a serve; a high follow-through has no toss
+# serve rule validated only on synthetic serves and one real backhand follow-through (IMG_2665, no serve);
+# in rear view (no nose) the head falls back to the shoulders, a weaker test for the toss
 
 
 def body_right_dir(kp: np.ndarray) -> float:
@@ -41,7 +44,9 @@ def body_right_dir(kp: np.ndarray) -> float:
 
 def _head_y(kp: np.ndarray) -> np.ndarray:
     """Per-frame head height; face hidden (player seen from behind): fall back on the shoulders."""
-    return np.where(np.isnan(kp[:, NOSE, 1]), kp[:, [L_SH, R_SH], 1].mean(axis=1), kp[:, NOSE, 1])
+    l, r = kp[:, L_SH, 1], kp[:, R_SH, 1]
+    shoulders = (np.fmin(l, r) + np.fmax(l, r)) / 2  # nanmean without the all-NaN warning
+    return np.where(np.isnan(kp[:, NOSE, 1]), shoulders, kp[:, NOSE, 1])
 
 
 def _above_head(kp: np.ndarray, wrist: int, a: int, b: int) -> bool:
@@ -55,8 +60,9 @@ def classify_stroke(kp: np.ndarray, frame: int, fps: float, settings: Settings, 
     other = L_WR if wr == R_WR else R_WR
     if not np.isfinite(right_dir) or right_dir == 0:
         return "other"
-    if (_above_head(kp, wr, frame - round(OVERHEAD_BEFORE_S * fps), frame + round(OVERHEAD_AFTER_S * fps))
-            and _above_head(kp, other, frame - round(TOSS_WINDOW_S * fps), frame)):
+    if _above_head(kp, wr, frame - round(OVERHEAD_BEFORE_S * fps), frame + round(OVERHEAD_AFTER_S * fps)):
+        if not _above_head(kp, other, frame - round(TOSS_WINDOW_S * fps), frame):
+            return "other"  # overhead without toss: the wrist near the midline makes the side test arbitrary
         return "serve" if prev_hit is None or (frame - prev_hit) / fps >= SERVE_MIN_GAP_S else "other"
     # no separate two-hand rule: on IMG_2665 forehand backswings also keep the hands together (free hand
     # on the racket throat), and a two-handed backhand's backswing is on the backhand side anyway

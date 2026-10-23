@@ -64,7 +64,13 @@ Valeurs retenues (`ace/strokes.py`) :
 | `HIT_MIN_SPEED` | 6,0 longueurs de buste/s | même score sur IMG_2665 de 5 à 8 |
 | `MIN_HIT_GAP_S` | 1,2 s | la préparation d'un revers donnait une fausse frappe 0,84 s avant l'impact |
 | côté du coup | médiane de 0,6 s à 0,1 s avant l'impact, orientation du corps fixe pour la vidéo | à l'impact le poignet traverse déjà vers l'autre côté |
-| service | poignet au-dessus de la tête autour de l'impact **et** lancer de balle (autre poignet au-dessus de la tête dans les 1,5 s avant) | un revers à deux mains finissait poignet au-dessus de la tête |
+| service | poignet au-dessus de la tête autour de l'impact **et** lancer de balle (autre poignet au-dessus de la tête dans les 1,5 s avant) ; bras en l'air sans lancer = `other` | un revers à deux mains finissait poignet au-dessus de la tête |
+
+Plus de règle « deux mains » : sur la vidéo du joueur, les mains restent aussi ensemble pendant la préparation du coup droit (main libre sur le cœur de la raquette) ; le réglage revers à 1 ou 2 mains est donc sans effet sur la détection pour l'instant.
+
+La règle du service n'est validée que sur des services synthétiques et sur une vraie fin de revers bras en l'air (IMG_2665 ne contient pas de service). En vue arrière (visage caché), la tête est remplacée par les épaules : le test du lancer y est moins fiable.
+
+Deux notes à moins de 0,3 s d'écart comptent pour un seul coup, aussi dans le score affiché par l'application.
 
 `THRESHOLDS` (`ace/technique.py`) n'ont pas été recalibrés : les notes du joueur portent sur les coups, pas sur les défauts.
 
@@ -73,7 +79,9 @@ Score sur IMG_2665 (vue filet, droitier, revers à deux mains, 8 coups notés) :
 | | Trouvés | Bien classés | Fausses frappes |
 |---|---|---|---|
 | Avant | 8/8 (100 %) | 1/8 (12 %) | 1 |
-| Après | 8/8 (100 %) | 8/8 (100 %) | 0 |
+| Après | 8/8 (100 %) | 7/8 (88 %) | 0 |
+
+Le revers de 16,4 s (fin bras au-dessus de la tête, sans lancer) est classé `other`.
 
 ## Tests
 

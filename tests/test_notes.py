@@ -41,6 +41,11 @@ def test_each_note_matched_once():
     assert sc.found_rate == 1.0 and sc.false_hits == 1
 
 
+def test_double_key_press_is_one_note():
+    sc = score_detection([S(7.0)], [Note(t=6.93, kind="forehand"), Note(t=7.06, kind="forehand")])
+    assert sc.n_notes == 1 and sc.found_rate == 1.0 and sc.false_hits == 0
+
+
 def test_no_notes_does_not_divide_by_zero():
     sc = score_detection([S(1)], [])
     assert sc.found_rate == 0.0 and sc.class_rate == 0.0 and sc.false_hits == 1

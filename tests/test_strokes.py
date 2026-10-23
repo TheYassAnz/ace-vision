@@ -128,13 +128,13 @@ def test_high_follow_through_without_toss_is_not_serve():
     # real video: a two-handed backhand finishing with the racket wrist above the head
     kp = _swing("camera", "left", two_hands=True)
     kp[100:104, R_WR, 1] = NOSE_Y - 30
-    assert _classify(kp) == "backhand"
+    assert _classify(kp) == "other"
 
 
-def test_overhead_without_toss_is_not_serve():
+def test_overhead_without_toss_is_other():
     kp = _swing("camera", "overhead")
     kp[:, L_WR] = kp[0, L_WR]  # free hand stays down
-    assert _classify(kp) != "serve"
+    assert _classify(kp) == "other"
 
 
 def test_missing_backswing_is_other():
