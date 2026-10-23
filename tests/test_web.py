@@ -131,7 +131,7 @@ def test_unreadable_video_shows_message(monkeypatch):
         raise RuntimeError("ffprobe failed")
     monkeypatch.setattr(store, "probe", boom)
     r = client.post("/matchs", files={"video": ("a.mov", b"garbage", "video/quicktime")}, data={"view": "net"})
-    assert r.status_code == 200 and "Ce fichier n'est pas une vidéo lisible." in r.text
+    assert r.status_code == 200 and "Ce fichier n&#39;est pas une vidéo lisible." in r.text
 
 
 def test_relaunch_while_busy_says_so(monkeypatch):
