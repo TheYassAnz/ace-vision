@@ -31,29 +31,29 @@ def make_pose(n_frames: int, facing: str = "camera") -> np.ndarray:
 
 
 def add_swing(kp, frame, side="right", speed=12.0, two_hands=False, handed="right"):
-    """Move the `handed` wrist to the body `side` ("right"/"left"/"overhead") with a peak of
-    `speed` torso-lengths/s at `frame`; the arm returns to rest afterwards."""
+    """Swing of the `handed` wrist: backswing on the body `side` ("right"/"left"/"overhead") held from
+    0.6 s to 0.1 s before `frame`, then a fast cross through impact (speed peak `speed` torso-lengths/s at
+    `frame`) to a follow-through on the other side, then back to rest. An overhead swing also raises the
+    other wrist above the head beforehand (ball toss); `two_hands` keeps both hands on the racket."""
     n = len(kp)
     d = np.sign(kp[0, R_HIP, 0] - kp[0, L_HIP, 0])  # image x direction of the player's right
     wr, other = (R_WR, L_WR) if handed == "right" else (L_WR, R_WR)
     rest, rest_o = kp[0, wr, :2].copy(), kp[0, other, :2].copy()
-    target = np.array([CX + d * {"right": 70.0, "left": -70.0, "overhead": 0.0}[side],
-                       NOSE_Y - 100.0 if side == "overhead" else REST_WRIST_Y])
-    # arm position: ramp in, hold, ramp out
-    env = np.zeros(n)
-    for k in range(n):
-        env[k] = np.clip(min(k - (frame - 3 - RAMP), (frame + 3 + RAMP) - k) / RAMP, 0, 1)
-    for w, r, t in ((wr, rest, target), *(((other, rest_o, target + [d * 20.0, 0.0]),) if two_hands else ())):
-        kp[:, w, :2] += env[:, None] * (t - r)
-    # fast lateral wiggle: out and back, zero net displacement; speeds at frames frame-2..frame+3
-    step = SHAPE * speed / 0.9 * 100.0 / FPS
-    sign = np.array([1, 1, 1, -1, -1, -1])
-    pos = np.cumsum(sign * step)
-    out = d * (-1.0 if side == "left" else 1.0)  # wiggle goes outward from the body
-    pos = np.concatenate([[0.0], pos])  # position at frame-3 .. frame+3
-    for i, p in enumerate(pos):
-        for w in (wr, other) if two_hands else (wr,):  # two hands travel together
-            kp[frame - 3 + i, w, 0] += p * out
+    out = d * (-1.0 if side == "left" else 1.0)  # image x direction of the stroke side
+    back = np.array([CX + (0.0 if side == "overhead" else out * 70.0),
+                     NOSE_Y - 100.0 if side == "overhead" else REST_WRIST_Y])
+    # cross through impact: speeds at frames frame-2..frame+3 follow SHAPE (smoothed peak = speed)
+    cross = np.concatenate([[0.0], np.cumsum(SHAPE * speed / 0.9 * 100.0 / FPS)])
+    k = np.arange(n)
+    path = np.tile(back, (n, 1))
+    path[:, 0] -= out * cross[np.clip(k - (frame - 3), 0, 6)]
+    # arm position: ramp in to the backswing (done at frame-18 = 0.6 s), hold, cross, ramp out
+    env = np.clip(np.minimum(k - (frame - 18 - RAMP), (frame + 3 + RAMP) - k) / RAMP, 0, 1)[:, None]
+    kp[:, wr, :2] += env * (path - rest)
+    if two_hands:
+        kp[:, other, :2] += env * (path + [d * 20.0, 0.0] - rest_o)
+    elif side == "overhead":
+        kp[:, other, :2] += env * (np.array([CX - d * 20.0, NOSE_Y - 120.0]) - rest_o)
     return kp
 
 

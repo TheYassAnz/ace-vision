@@ -2,9 +2,9 @@ import numpy as np
 import pytest
 
 from ace.domain import Settings
-from ace.strokes import classify_stroke, detect_hits, detect_strokes
-from ace.geometry import NOSE, R_WR
-from tests.synthetic import add_swing, make_pose
+from ace.strokes import body_right_dir, classify_stroke, detect_hits, detect_strokes
+from ace.geometry import L_HIP, L_WR, NOSE, R_HIP, R_WR
+from tests.synthetic import NOSE_Y, add_swing, make_pose
 
 FPS = 30.0
 RIGHT = Settings(handedness="right", backhand_hands=2)
@@ -53,60 +53,99 @@ def test_left_handed_uses_left_wrist():
     assert detect_hits(kp, FPS, LEFT) == []
 
 
+def test_backswing_shortly_before_hit_is_not_a_hit():
+    # real video: the backswing of a backhand peaked 0.84 s before its impact
+    kp = make_pose(250)
+    add_swing(kp, 100, "right", speed=8.0)
+    add_swing(kp, 125, "left")
+    hits = detect_hits(kp, FPS, RIGHT)
+    assert len(hits) == 1 and abs(hits[0] - 125) <= 2
+
+
 def _swing(facing, side, handed="right", two_hands=False):
     kp = make_pose(200, facing=facing)
     add_swing(kp, 100, side, handed=handed, two_hands=two_hands)
     return kp
 
 
+def _classify(kp, settings=RIGHT, prev_hit=None):
+    return classify_stroke(kp, 100, FPS, settings, prev_hit, body_right_dir(kp))
+
+
 @pytest.mark.parametrize("facing", ["camera", "away"])
 def test_forehand_facing_camera_and_back(facing):
-    assert classify_stroke(_swing(facing, "right"), 100, FPS, RIGHT, None) == "forehand"
+    assert _classify(_swing(facing, "right")) == "forehand"
 
 
 @pytest.mark.parametrize("facing", ["camera", "away"])
 def test_backhand_right_hander(facing):
-    assert classify_stroke(_swing(facing, "left"), 100, FPS, Settings(backhand_hands=1), None) == "backhand"
+    assert _classify(_swing(facing, "left"), Settings(backhand_hands=1)) == "backhand"
 
 
 def test_left_hander_mirrors():
     kp = _swing("camera", "left", handed="left")
-    assert classify_stroke(kp, 100, FPS, LEFT, None) == "forehand"
+    assert _classify(kp, LEFT) == "forehand"
 
 
 def test_two_handed_backhand():
-    # right side of the body: only the two-hand rule can make this a backhand
-    kp = _swing("away", "right", two_hands=True)
-    assert classify_stroke(kp, 100, FPS, RIGHT, None) == "backhand"
+    assert _classify(_swing("away", "left", two_hands=True)) == "backhand"
+
+
+def test_forehand_with_free_hand_on_racket_during_backswing():
+    # real video: the free hand holds the racket throat during the forehand unit turn
+    assert _classify(_swing("camera", "right", two_hands=True)) == "forehand"
 
 
 def test_one_handed_swing_right_side_is_forehand_with_two_hand_setting():
-    kp = _swing("away", "right", two_hands=False)
-    assert classify_stroke(kp, 100, FPS, RIGHT, None) == "forehand"
+    assert _classify(_swing("away", "right", two_hands=False)) == "forehand"
+
+
+def test_side_ignores_hips_swapping_when_side_on():
+    kp = _swing("camera", "right")
+    kp[70:100, [L_HIP, R_HIP], 0] = kp[70:100, [R_HIP, L_HIP], 0]  # turned side-on: hip order flips
+    assert _classify(kp) == "forehand"
 
 
 def test_overhead_after_pause_is_serve():
-    assert classify_stroke(_swing("camera", "overhead"), 100, FPS, RIGHT, 100 - 150) == "serve"
+    assert _classify(_swing("camera", "overhead"), prev_hit=100 - 150) == "serve"
 
 
 def test_overhead_quick_is_other():
-    assert classify_stroke(_swing("camera", "overhead"), 100, FPS, RIGHT, 100 - 30) == "other"
+    assert _classify(_swing("camera", "overhead"), prev_hit=100 - 30) == "other"
 
 
 def test_first_overhead_is_serve():
-    assert classify_stroke(_swing("camera", "overhead"), 100, FPS, RIGHT, None) == "serve"
+    assert _classify(_swing("camera", "overhead")) == "serve"
 
 
 def test_overhead_without_nose_uses_shoulders():
     kp = _swing("away", "overhead")
     kp[:, NOSE] = np.nan  # seen from behind: no face
-    assert classify_stroke(kp, 100, FPS, RIGHT, None) == "serve"
+    assert _classify(kp) == "serve"
 
 
-def test_missing_keypoints_is_other():
+def test_high_follow_through_without_toss_is_not_serve():
+    # real video: a two-handed backhand finishing with the racket wrist above the head
+    kp = _swing("camera", "left", two_hands=True)
+    kp[100:104, R_WR, 1] = NOSE_Y - 30
+    assert _classify(kp) == "backhand"
+
+
+def test_overhead_without_toss_is_not_serve():
+    kp = _swing("camera", "overhead")
+    kp[:, L_WR] = kp[0, L_WR]  # free hand stays down
+    assert _classify(kp) != "serve"
+
+
+def test_missing_backswing_is_other():
     kp = _swing("camera", "right")
-    kp[100, R_WR] = np.nan
-    assert classify_stroke(kp, 100, FPS, RIGHT, None) == "other"
+    kp[82:91, R_WR] = np.nan  # 9 of the 16 backswing frames
+    assert _classify(kp) == "other"
+
+
+def test_unknown_orientation_is_other():
+    kp = _swing("camera", "right")
+    assert classify_stroke(kp, 100, FPS, RIGHT, None, float("nan")) == "other"
 
 
 def test_detect_strokes():

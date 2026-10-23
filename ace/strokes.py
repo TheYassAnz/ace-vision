@@ -4,8 +4,8 @@ from scipy.signal import find_peaks
 from ace.domain import Settings, Stroke, StrokeKind
 from ace.geometry import L_HIP, L_SH, L_WR, NOSE, R_HIP, R_SH, R_WR, torso_length
 
-HIT_MIN_SPEED = 6.0  # torso lengths / s; shortcut: valeur de départ, à recalibrer avec les notes du joueur (Task 12)
-MIN_HIT_GAP_S = 0.8
+HIT_MIN_SPEED = 6.0  # torso lengths / s; IMG_2665 scores the same from 5 to 8 (calibrated Task 12)
+MIN_HIT_GAP_S = 1.2  # a backswing can peak ~0.85 s before its impact (IMG_2665); find_peaks keeps the stronger
 
 
 def _dominant_wrist(settings: Settings) -> int:
@@ -26,33 +26,52 @@ def detect_hits(kp: np.ndarray, fps: float, settings: Settings) -> list[int]:
 
 
 SERVE_MIN_GAP_S = 3.0
-TWO_HAND_MAX_DIST = 0.6  # torso lengths between wrists
-SIDE_WINDOW_S = 0.5
+BACKSWING_START_S, BACKSWING_END_S = 0.6, 0.1  # side read before impact: at impact the wrist is already crossing
+MIN_VALID_SHARE = 0.5  # of backswing frames with wrist and hips seen
+OVERHEAD_BEFORE_S, OVERHEAD_AFTER_S = 0.15, 0.1  # around impact, racket wrist above the head
+TOSS_WINDOW_S = 1.5  # free wrist above the head before a serve; a high follow-through has no toss
 
 
-def classify_stroke(kp: np.ndarray, frame: int, fps: float, settings: Settings, prev_hit: int | None) -> StrokeKind:
+def body_right_dir(kp: np.ndarray) -> float:
+    """Image x direction of the player's right side, fixed for the whole video: the player never changes
+    side and faces one way per video, while the per-frame hip order flips whenever he turns side-on."""
+    d = kp[:, R_HIP, 0] - kp[:, L_HIP, 0]
+    return float(np.sign(np.nanmedian(d))) if np.isfinite(d).any() else float("nan")
+
+
+def _head_y(kp: np.ndarray) -> np.ndarray:
+    """Per-frame head height; face hidden (player seen from behind): fall back on the shoulders."""
+    return np.where(np.isnan(kp[:, NOSE, 1]), kp[:, [L_SH, R_SH], 1].mean(axis=1), kp[:, NOSE, 1])
+
+
+def _above_head(kp: np.ndarray, wrist: int, a: int, b: int) -> bool:
+    w = kp[max(0, a) : b + 1]
+    return bool(np.any(w[:, wrist, 1] < _head_y(w)))  # image y grows downward: smaller = higher; NaN is False
+
+
+def classify_stroke(kp: np.ndarray, frame: int, fps: float, settings: Settings, prev_hit: int | None,
+                    right_dir: float) -> StrokeKind:
     wr = _dominant_wrist(settings)
-    hips = kp[frame, [L_HIP, R_HIP], :2]
-    if np.isnan(kp[frame, wr, :2]).any() or np.isnan(hips).any():
-        return "other"
-    head_y = kp[frame, NOSE, 1]
-    if np.isnan(head_y):  # face hidden (player seen from behind): fall back on the shoulders
-        head_y = kp[frame, [L_SH, R_SH], 1].mean()
-    if kp[frame, wr, 1] < head_y:  # image y grows downward: smaller = higher
-        return "serve" if prev_hit is None or (frame - prev_hit) / fps >= SERVE_MIN_GAP_S else "other"
-    torso = torso_length(kp)
     other = L_WR if wr == R_WR else R_WR
-    if settings.backhand_hands == 2 and np.linalg.norm(kp[frame, wr, :2] - kp[frame, other, :2]) < TWO_HAND_MAX_DIST * torso:
-        return "backhand"
-    window = kp[max(0, frame - round(SIDE_WINDOW_S * fps)) : frame + 1]
-    right_dir = np.sign(np.nanmean(window[:, R_HIP, 0] - window[:, L_HIP, 0]))
-    s = (kp[frame, wr, 0] - hips[:, 0].mean()) * right_dir  # > 0: player's right side
-    return "forehand" if (s > 0) == (settings.handedness == "right") else "backhand"
+    if not np.isfinite(right_dir) or right_dir == 0:
+        return "other"
+    if (_above_head(kp, wr, frame - round(OVERHEAD_BEFORE_S * fps), frame + round(OVERHEAD_AFTER_S * fps))
+            and _above_head(kp, other, frame - round(TOSS_WINDOW_S * fps), frame)):
+        return "serve" if prev_hit is None or (frame - prev_hit) / fps >= SERVE_MIN_GAP_S else "other"
+    # no separate two-hand rule: on IMG_2665 forehand backswings also keep the hands together (free hand
+    # on the racket throat), and a two-handed backhand's backswing is on the backhand side anyway
+    w = kp[max(0, frame - round(BACKSWING_START_S * fps)) : frame - round(BACKSWING_END_S * fps) + 1]
+    s = (w[:, wr, 0] - w[:, [L_HIP, R_HIP], 0].mean(axis=1)) * right_dir  # > 0: player's right side
+    s = s[np.isfinite(s)]
+    if len(w) == 0 or len(s) < MIN_VALID_SHARE * len(w):
+        return "other"
+    return "forehand" if (np.median(s) > 0) == (settings.handedness == "right") else "backhand"
 
 
 def detect_strokes(kp: np.ndarray, fps: float, settings: Settings) -> list[Stroke]:
     strokes, prev = [], None
+    right_dir = body_right_dir(kp)
     for f in detect_hits(kp, fps, settings):
-        strokes.append(Stroke(t=f / fps, frame=f, kind=classify_stroke(kp, f, fps, settings, prev)))
+        strokes.append(Stroke(t=f / fps, frame=f, kind=classify_stroke(kp, f, fps, settings, prev, right_dir)))
         prev = f
     return strokes
