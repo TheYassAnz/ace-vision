@@ -37,6 +37,7 @@ runner = JobRunner()
 
 
 def recover_interrupted() -> None:
+    store.clear_incoming()
     for m in store.list_matches():
         if m.status == "running":
             m.status, m.error = "failed", "Analyse interrompue (l'app a été fermée)."

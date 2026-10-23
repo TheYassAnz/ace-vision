@@ -17,6 +17,12 @@ def _kpts(conf=0.9):
     return k
 
 
+def test_ultralytics_runs_offline():
+    import ultralytics.utils
+    from ultralytics.utils.events import events
+    assert ultralytics.utils.ONLINE is False and events.enabled is False
+
+
 def test_select_player_prefers_persistent_track():
     a = [(f, 100.0, _kpts()) for f in range(900)]
     b = [(f, 300.0, _kpts()) for f in range(900, 950)]

@@ -3,7 +3,7 @@ import pytest
 
 from ace.domain import Settings
 from ace.strokes import classify_stroke, detect_hits, detect_strokes
-from ace.geometry import R_WR
+from ace.geometry import NOSE, R_WR
 from tests.synthetic import add_swing, make_pose
 
 FPS = 30.0
@@ -95,6 +95,12 @@ def test_overhead_quick_is_other():
 
 def test_first_overhead_is_serve():
     assert classify_stroke(_swing("camera", "overhead"), 100, FPS, RIGHT, None) == "serve"
+
+
+def test_overhead_without_nose_uses_shoulders():
+    kp = _swing("away", "overhead")
+    kp[:, NOSE] = np.nan  # seen from behind: no face
+    assert classify_stroke(kp, 100, FPS, RIGHT, None) == "serve"
 
 
 def test_missing_keypoints_is_other():

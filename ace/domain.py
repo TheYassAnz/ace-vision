@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 StrokeKind = Literal["forehand", "backhand", "serve", "other"]
 View = Literal["net", "rear"]
@@ -33,6 +33,7 @@ class VideoInfo(BaseModel):
 
 
 class Stroke(BaseModel):
+    model_config = ConfigDict(ser_json_inf_nan="constants")  # unmeasurable metrics are NaN; JSON null would not reload
     t: float
     frame: int
     kind: StrokeKind
@@ -84,3 +85,5 @@ class Match(BaseModel):
     rallies: list[Rally] | None = None
     findings: list[Finding] = Field(default_factory=list)
     score: Score | None = None
+    coverage: float | None = None  # share of frames where the player's hips were found
+    n_unmeasured: int = 0  # forehands/backhands/serves without any usable metric

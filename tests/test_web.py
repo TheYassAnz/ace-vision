@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from ace import __main__ as entry
 from ace import store
-from ace.domain import VideoInfo
+from ace.domain import Stroke, VideoInfo
 from ace.jobs import runner
 from ace.web.app import app
 
@@ -65,11 +65,13 @@ def test_failed_page_has_relaunch_button():
     assert "Relancer" in r.text and "boom" in r.text
 
 
-def test_running_and_done_pages():
+def test_running_and_done_pages(monkeypatch):
     m = make()
     m.status = "running"
     store.save(m)
+    monkeypatch.setattr(runner, "running_id", m.id)
     assert "Analyse en cours" in client.get(f"/matchs/{m.id}").text
+    monkeypatch.setattr(runner, "running_id", None)
     m.status = "done"
     store.save(m)
     assert "Vue d'ensemble" in client.get(f"/matchs/{m.id}").text
@@ -144,3 +146,53 @@ def test_relaunch_while_busy_says_so(monkeypatch):
 def test_title_is_escaped():
     make(title="<script>x</script>")
     assert "<script>x</script>" not in client.get("/").text
+
+
+def test_runner_is_truth_for_running(monkeypatch):
+    m = make()  # match.json still says pending: the analysis thread has not saved yet
+    monkeypatch.setattr(runner, "running_id", m.id)
+    assert "Analyse en cours" in client.get(f"/matchs/{m.id}").text
+    assert client.get(f"/matchs/{m.id}/statut").json()["status"] == "running"
+
+
+def test_stuck_running_shows_interrupted(monkeypatch):
+    m = make()
+    m.status = "running"  # final save failed: no runner is working on it
+    store.save(m)
+    monkeypatch.setattr(runner, "running_id", None)
+    r = client.get(f"/matchs/{m.id}")
+    assert "Analyse interrompue" in r.text and "Relancer" in r.text
+    assert client.get(f"/matchs/{m.id}/statut").json()["status"] == "failed"
+
+
+def test_unexpected_import_error_is_french(monkeypatch):
+    def boom(*a):
+        raise ValueError("1 validation error for Match")
+    monkeypatch.setattr(store, "create_match", boom)
+    r = client.post("/matchs", files={"video": ("a.mov", b"abc", "video/quicktime")}, data={"view": "net"})
+    assert "validation error" not in r.text and "Ce fichier n&#39;est pas une vidéo lisible." in r.text
+
+
+def done(**kw):
+    m = make()
+    m.status = "done"
+    for k, v in kw.items():
+        setattr(m, k, v)
+    store.save(m)
+    return client.get(f"/matchs/{m.id}").text
+
+
+def test_every_stroke_can_be_rewatched():
+    assert 'data-t="12.5"' in done(strokes=[Stroke(t=12.5, frame=375, kind="forehand")])
+
+
+def test_low_coverage_notice():
+    assert "Tu n'as été repéré que sur 40 % de la vidéo" in done(coverage=0.4)
+    assert "repéré que sur" not in done(coverage=0.9)
+
+
+def test_unmeasured_strokes_replace_no_defect_sentence():
+    strokes = [Stroke(t=i, frame=i * 30, kind="forehand") for i in range(4)]
+    text = done(strokes=strokes, n_unmeasured=3)
+    assert "ne permet pas de mesurer ta technique" in text and "Aucun défaut" not in text
+    assert "Aucun défaut" in done(strokes=strokes, n_unmeasured=1)

@@ -1,4 +1,5 @@
 import io
+import subprocess
 import threading
 from pathlib import Path
 
@@ -7,6 +8,7 @@ import pytest
 
 from ace import jobs, pipeline, store
 from ace.domain import VideoInfo
+from ace.geometry import L_ANK, L_HIP, L_SH, R_ANK, R_HIP, R_SH
 from ace.jobs import JobRunner
 from tests.synthetic import add_swing, make_pose
 
@@ -50,7 +52,50 @@ def test_analyse_failure_marks_failed(match, monkeypatch):
     monkeypatch.setattr(pipeline, "extract_pose", boom)
     pipeline.analyse(match.id)
     m = store.load(match.id)
-    assert m.status == "failed" and m.error == "L'analyse a échoué : modèle absent"
+    assert m.status == "failed" and m.error == "L'analyse a échoué."  # raw exception text stays in the log
+
+
+def test_unreadable_video_reason_is_french(match, monkeypatch):
+    def bad(p):
+        raise subprocess.CalledProcessError(1, ["ffprobe"], stderr="moov atom not found")
+
+    monkeypatch.setattr(pipeline, "probe", bad)
+    pipeline.analyse(match.id)
+    assert store.load(match.id).error == "L'analyse a échoué : vidéo illisible."
+
+
+def test_nan_metrics_survive_reload_and_report_renders(match, monkeypatch):
+    from fastapi.testclient import TestClient
+    from ace.web.app import app
+
+    def pose(path, info, on_progress):
+        kp = _fake_pose(path, info, on_progress)
+        kp[:, [L_ANK, R_ANK]] = np.nan  # ankles hidden: stance_ratio is NaN
+        return kp
+
+    monkeypatch.setattr(pipeline, "extract_pose", pose)
+    pipeline.analyse(match.id)
+    m = store.load(match.id)
+    assert m.status == "done" and m.strokes and np.isnan(m.strokes[0].metrics["stance_ratio"])
+    assert [x.id for x in store.list_matches()] == [match.id]
+    r = TestClient(app, base_url="http://127.0.0.1:8765").get(f"/matchs/{match.id}")
+    assert r.status_code == 200 and "Vue d'ensemble" in r.text
+
+
+def test_coverage_and_unmeasured_strokes(match, monkeypatch):
+    def pose(path, info, on_progress):
+        kp = _fake_pose(path, info, on_progress)
+        kp[:180, [L_HIP, R_HIP]] = np.nan  # player not found on the first quarter
+        kp[:, [L_ANK, R_ANK]] = np.nan
+        for f in range(60, 660, 100):  # shoulders hidden before every hit: no metric is measurable
+            kp[f - 35:f + 1, [L_SH, R_SH]] = np.nan
+        return kp
+
+    monkeypatch.setattr(pipeline, "extract_pose", pose)
+    pipeline.analyse(match.id)
+    m = store.load(match.id)
+    assert m.coverage == pytest.approx(0.75)
+    assert m.n_unmeasured == sum(s.kind != "other" for s in m.strokes) > 0
 
 
 def test_runner_one_at_a_time(match, monkeypatch):
@@ -73,6 +118,13 @@ def test_recover_interrupted(match):
     assert m.status == "failed" and m.error == "Analyse interrompue (l'app a été fermée)."
 
 
+def test_recover_clears_leftover_uploads(match):
+    leftover = store._root() / "incoming" / "tmp123.mov"
+    leftover.write_bytes(b"half")
+    jobs.recover_interrupted()
+    assert not leftover.exists()
+
+
 def test_recover_skips_corrupt_match(match):
     other = store.create_match(io.BytesIO(b"y"), "b.mov", "net", "")
     other.status = "running"
@@ -92,7 +144,7 @@ def test_failed_retry_clears_stale_results_and_empty_message(match, monkeypatch)
     monkeypatch.setattr(pipeline, "extract_pose", boom)
     pipeline.analyse(match.id)
     m = store.load(match.id)
-    assert m.status == "failed" and m.strokes == [] and m.error == "L'analyse a échoué : RuntimeError"
+    assert m.status == "failed" and m.strokes == [] and m.error == "L'analyse a échoué."
 
 
 @pytest.mark.slow

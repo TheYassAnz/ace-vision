@@ -1,3 +1,7 @@
+import os
+
+os.environ.setdefault("YOLO_OFFLINE", "1")  # before ultralytics loads: no analytics or online checks
+
 import uvicorn
 
 from ace.jobs import recover_interrupted

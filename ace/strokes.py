@@ -2,7 +2,7 @@ import numpy as np
 from scipy.signal import find_peaks
 
 from ace.domain import Settings, Stroke, StrokeKind
-from ace.geometry import L_HIP, L_WR, NOSE, R_HIP, R_WR, torso_length
+from ace.geometry import L_HIP, L_SH, L_WR, NOSE, R_HIP, R_SH, R_WR, torso_length
 
 HIT_MIN_SPEED = 6.0  # torso lengths / s; shortcut: valeur de départ, à recalibrer avec les notes du joueur (Task 12)
 MIN_HIT_GAP_S = 0.8
@@ -35,7 +35,10 @@ def classify_stroke(kp: np.ndarray, frame: int, fps: float, settings: Settings, 
     hips = kp[frame, [L_HIP, R_HIP], :2]
     if np.isnan(kp[frame, wr, :2]).any() or np.isnan(hips).any():
         return "other"
-    if kp[frame, wr, 1] < kp[frame, NOSE, 1]:  # image y grows downward: smaller = higher
+    head_y = kp[frame, NOSE, 1]
+    if np.isnan(head_y):  # face hidden (player seen from behind): fall back on the shoulders
+        head_y = kp[frame, [L_SH, R_SH], 1].mean()
+    if kp[frame, wr, 1] < head_y:  # image y grows downward: smaller = higher
         return "serve" if prev_hit is None or (frame - prev_hit) / fps >= SERVE_MIN_GAP_S else "other"
     torso = torso_length(kp)
     other = L_WR if wr == R_WR else R_WR

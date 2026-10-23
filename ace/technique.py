@@ -10,6 +10,7 @@ _APPLICABLE: dict[StrokeKind, list[DefectId]] = {
 }
 _NAN = float('nan')
 MIN_COVERAGE = 0.5  # share of valid frames a windowed metric needs, else NaN
+TURN_PLATEAU = 0.03  # ratios this close to the window minimum count as "turned": the turn ends at the first one
 
 
 def _width(kp: np.ndarray, left: int, right: int) -> np.ndarray:
@@ -26,8 +27,10 @@ def measure(kp: np.ndarray, frame: int, fps: float, ref_shoulder: float) -> dict
     lo = max(0, frame - round(1.0 * fps))
     w = _width(kp[lo:frame + 1], L_SH, R_SH) / ref_shoulder  # NaN ref -> all NaN
     if np.isfinite(w).mean() >= MIN_COVERAGE:
-        i = int(np.nanargmin(w))
-        out["turn_ratio"], out["prep_lead_s"] = float(w[i]), (frame - (lo + i)) / fps
+        out["turn_ratio"] = float(np.nanmin(w))
+        if out["turn_ratio"] <= THRESHOLDS["small_turn"]:  # without a real turn the minimum's frame is noise
+            i = int(np.argmax(w <= out["turn_ratio"] + TURN_PLATEAU))
+            out["prep_lead_s"] = (frame - (lo + i)) / fps
     per_frame = [min((a for a in (angle_deg(kp[f, h, :2], kp[f, k, :2], kp[f, an, :2])
                                   for h, k, an in ((L_HIP, L_KNEE, L_ANK), (R_HIP, R_KNEE, R_ANK))) if a == a),
                      default=_NAN)  # best of the complete legs

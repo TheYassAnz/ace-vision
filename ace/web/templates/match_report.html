@@ -8,6 +8,7 @@
 </style>
 <h1>{{ m.title or m.id }}</h1>
 <p>{{ view_labels[m.view] }}</p>
+{% if m.coverage is not none and m.coverage < 0.8 %}<p class="notice">Tu n'as été repéré que sur {{ (m.coverage * 100)|round|int }} % de la vidéo : les chiffres ne portent que sur cette partie.</p>{% endif %}
 {% if m.score %}<p>Fiabilité : {{ (m.score.found_rate * 100)|round|int }} % de tes coups trouvés, {{ (m.score.class_rate * 100)|round|int }} % bien classés</p>{% endif %}
 <p><a href="/matchs/{{ m.id }}/noter">Noter mes coups</a></p>
 
@@ -40,14 +41,18 @@
 <div class="clips">{% for t in f.clip_times %}<button type="button" data-t="{{ t }}">Extrait ▶ {{ '%d:%02d'|format(t // 60, t % 60) }}</button>{% endfor %}</div>
 </div>
 {% else %}
+{% if m.n_unmeasured * 2 > counts.forehand + counts.backhand + counts.serve %}
+<p>La vidéo ne permet pas de mesurer ta technique de façon fiable sur ce match.</p>
+{% else %}
 <p>Aucun défaut ne revient assez souvent sur ce match pour en tirer un conseil.</p>
+{% endif %}
 {% endfor %}
 
 <details>
 <summary>Tous mes coups</summary>
 <table>
 <tr><th>Temps</th><th>Type</th><th>Défauts</th></tr>
-{% for s in m.strokes %}<tr><td>{{ '%d:%02d'|format(s.t // 60, s.t % 60) }}</td><td>{{ stroke_labels[s.kind] }}</td><td>{% for d in s.defects %}{{ defect_labels[d] }}{{ ', ' if not loop.last }}{% endfor %}</td></tr>{% endfor %}
+{% for s in m.strokes %}<tr data-t="{{ s.t }}"><td><button type="button">{{ '%d:%02d'|format(s.t // 60, s.t % 60) }} ▶</button></td><td>{{ stroke_labels[s.kind] }}</td><td>{% for d in s.defects %}{{ defect_labels[d] }}{{ ', ' if not loop.last }}{% endfor %}</td></tr>{% endfor %}
 </table>
 </details>
 <script src="/static/app.js"></script>

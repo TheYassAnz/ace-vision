@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -15,6 +16,7 @@ from ace.jobs import runner
 from ace.notes import Note, score_detection
 
 HERE = Path(__file__).parent
+log = logging.getLogger(__name__)
 app = FastAPI()
 ORIGINS = ("http://127.0.0.1:8765", "http://localhost:8765")
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])  # DNS rebinding
@@ -69,6 +71,13 @@ def get_match(id: str) -> Match:
         raise HTTPException(404, "Match introuvable.")
 
 
+def live_status(m: Match) -> str:
+    """The runner is the truth for "running": match.json lags at start and can stay stuck after a failed save."""
+    if runner.running_id == m.id:
+        return "running"
+    return "failed" if m.status == "running" else m.status
+
+
 def see(id: str) -> RedirectResponse:
     return RedirectResponse(f"/matchs/{id}", status_code=303)
 
@@ -87,9 +96,10 @@ def add_form(request: Request, error: str | None = None):
 def create(request: Request, video: UploadFile = File(...), view: Literal["net", "rear"] = Form(...), title: str = Form("")):
     try:
         m = store.create_match(video.file, video.filename or "", view, title.strip())
-    except ValueError as e:
+    except store.UserError as e:
         return render(request, "add.html", error=str(e))
-    except Exception:  # probe/ffprobe failure on a corrupt or non-video file
+    except Exception:  # probe/ffprobe failure on a corrupt or non-video file; never show raw English text
+        log.exception("import of %r failed", video.filename)
         return render(request, "add.html", error="Ce fichier n'est pas une vidéo lisible.")
     if not runner.start(m.id):
         return RedirectResponse(f"/matchs/{m.id}?attente=1", status_code=303)
@@ -99,7 +109,10 @@ def create(request: Request, video: UploadFile = File(...), view: Literal["net",
 @app.get("/matchs/{id}")
 def match_page(request: Request, id: str, attente: int = 0):
     m = get_match(id)
-    page = {"running": "match_running.html", "done": "match_report.html"}.get(m.status, "match_failed.html")
+    status = live_status(m)
+    if status == "failed" and m.status == "running":
+        m.status, m.error = "failed", "Analyse interrompue."
+    page = {"running": "match_running.html", "done": "match_report.html"}.get(status, "match_failed.html")
     counts = {k: sum(s.kind == k for s in m.strokes) for k in STROKE_LABELS}
     return render(request, page, m=m, queued_msg=QUEUED_MSG if attente else None, counts=counts,
                   rallies=rally_summary(m), of_total=of_total, defect_labels=DEFECT_LABELS)
@@ -108,7 +121,7 @@ def match_page(request: Request, id: str, attente: int = 0):
 @app.get("/matchs/{id}/statut")
 def status(id: str):
     m = get_match(id)
-    return JSONResponse({"status": m.status, "progress": m.progress, "error": m.error})
+    return JSONResponse({"status": live_status(m), "progress": m.progress, "error": m.error})
 
 
 @app.post("/matchs/{id}/relancer")

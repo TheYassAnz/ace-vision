@@ -92,7 +92,7 @@ def test_reanalysis_recomputes_score(env, monkeypatch):
     m.score = Score(n_notes=9, n_detected=9, found_rate=1, class_rate=1, false_hits=0)
     store.save(m)
     monkeypatch.setattr(pipeline, "probe", lambda p: m.info)
-    monkeypatch.setattr(pipeline, "extract_pose", lambda *a: None)
+    monkeypatch.setattr(pipeline, "extract_pose", lambda *a: pipeline.np.full((30, 17, 3), float("nan")))
     monkeypatch.setattr(pipeline.np, "savez_compressed", lambda *a, **k: None)
     monkeypatch.setattr(pipeline, "detect_strokes", lambda *a: [S(1)])
     monkeypatch.setattr(pipeline, "ref_shoulder_width", lambda kp: float("nan"))

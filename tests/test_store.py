@@ -87,9 +87,25 @@ def test_import_of_running_match_refused():
     m = store.create_match(io.BytesIO(b"a"), "a.mov", "net", "")
     m.status = "running"
     store.save(m)
-    with pytest.raises(ValueError, match="en cours d'analyse"):
+    with pytest.raises(store.UserError, match="en cours d'analyse"):
         store.create_match(io.BytesIO(b"b"), "a.mov", "net", "")
     assert (store.match_dir(m.id) / m.video_file).read_bytes() == b"a"
+
+
+def test_reimport_of_changed_video_drops_notes():
+    from ace.notes import Note
+    m = store.create_match(io.BytesIO(b"a"), "a.mov", "net", "")
+    store.save_notes(m.id, [Note(t=1, kind="forehand")])
+    store.create_match(io.BytesIO(b"a"), "a.mov", "net", "")  # same video: notes kept
+    assert store.load_notes(m.id) is not None
+    m2 = store.create_match(io.BytesIO(b"b"), "a.mov", "net", "")
+    assert store.load_notes(m.id) is None and m2.score is None
+
+
+def test_reimport_repairs_unreadable_match():
+    m = store.create_match(io.BytesIO(b"a"), "a.mov", "net", "")
+    (store.match_dir(m.id) / "match.json").write_text("{not json")
+    assert store.create_match(io.BytesIO(b"a"), "a.mov", "net", "").status == "pending"
 
 
 def test_concurrent_saves_never_raise():

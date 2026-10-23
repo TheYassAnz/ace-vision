@@ -24,6 +24,22 @@ def test_late_preparation():
     assert "late_prep" not in detect_defects(metrics(early), "forehand")
 
 
+def test_no_turn_gives_no_prep_time():
+    kp = pose()
+    set_shoulder_width(kp, IMPACT - 2, 76)  # 0.95 x ref: noise, not a turn
+    m = metrics(kp)
+    assert np.isnan(m["prep_lead_s"]) and "late_prep" not in detect_defects(m, "forehand")
+
+
+def test_held_turn_counts_from_its_start():
+    kp = pose()
+    for f in range(IMPACT - 18, IMPACT):  # turned 0.6 s before impact and held
+        set_shoulder_width(kp, f, 40)
+    set_shoulder_width(kp, IMPACT - 2, 39)  # tiny dip just before impact
+    m = metrics(kp)
+    assert m["prep_lead_s"] == pytest.approx(0.6) and "late_prep" not in detect_defects(m, "forehand")
+
+
 def test_small_turn():
     small, big = pose(), pose()
     set_shoulder_width(small, IMPACT - 15, 72)  # 0.9 x ref

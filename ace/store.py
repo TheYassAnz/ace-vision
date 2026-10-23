@@ -1,3 +1,4 @@
+import filecmp
 import json
 import os
 import re
@@ -15,6 +16,10 @@ from ace.video import probe
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"  # overridden at call time by ACE_DATA_DIR
 
 
+class UserError(ValueError):
+    """A French message meant for the user (other exceptions never reach the UI as text)."""
+
+
 _lock = threading.RLock()  # serialises match.json writes and re-imports
 
 
@@ -28,11 +33,11 @@ VIDEO_EXTS = {".mov", ".mp4", ".m4v"}
 
 def match_dir(id: str) -> Path:
     if not ID_RE.fullmatch(id):
-        raise ValueError(f"identifiant de match invalide : {id!r}")
+        raise UserError(f"identifiant de match invalide : {id!r}")
     base = (_root() / "matchs").resolve()
     d = (base / id).resolve()
     if not d.is_relative_to(base):
-        raise ValueError(f"identifiant de match invalide : {id!r}")
+        raise UserError(f"identifiant de match invalide : {id!r}")
     return d
 
 
@@ -85,11 +90,17 @@ def save_settings(s: Settings) -> None:
     _write_atomic(_root() / "settings.json", s.model_dump_json(indent=1))
 
 
+def clear_incoming() -> None:
+    """Remove uploads left half-written by an app that was closed mid-import."""
+    for f in (_root() / "incoming").glob("*"):
+        f.unlink(missing_ok=True)
+
+
 def create_match(src: BinaryIO, filename: str, view: View, title: str) -> Match:
     """Stream the upload to disk, probe it, and (re)create the match; a re-import resets the analysis."""
     ext = Path(filename).suffix.lower()
     if ext not in VIDEO_EXTS:
-        raise ValueError("Format de vidéo non pris en charge (.mov, .mp4, .m4v).")
+        raise UserError("Format de vidéo non pris en charge (.mov, .mp4, .m4v).")
     name = "video" + ext  # never the raw upload name
     tmp_dir = _root() / "incoming"
     tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -106,8 +117,17 @@ def create_match(src: BinaryIO, filename: str, view: View, title: str) -> Match:
         with _lock:
             d = match_dir(id)
             d.mkdir(parents=True, exist_ok=True)
-            if (d / "match.json").exists() and load(id).status == "running":
-                raise ValueError("Ce match est en cours d'analyse.")
+            try:
+                old = load(id)
+            except (OSError, ValueError):  # new match, or unreadable match.json: a re-import repairs it
+                old = None
+            if old and old.status == "running":
+                raise UserError("Ce match est en cours d'analyse.")
+            old_video = d / old.video_file if old else None
+            if not (old_video and old_video.is_file() and filecmp.cmp(tmp, old_video, shallow=False)):
+                (d / "notes.json").unlink(missing_ok=True)  # notes belong to the old video
+            if old_video and old_video.name != name:
+                old_video.unlink(missing_ok=True)
             shutil.move(tmp, d / name)
             pose_path(id).unlink(missing_ok=True)
             m = Match(id=id, title=title, view=view, video_file=name, info=info, settings=load_settings())
