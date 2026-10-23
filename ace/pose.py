@@ -8,7 +8,7 @@ from ace.domain import VideoInfo
 from ace.geometry import MIN_CONF
 from ace.video import iter_frames
 
-MODEL = "models/yolo11m-pose.pt"
+MODEL = str(Path(__file__).resolve().parent.parent / "models" / "yolo11m-pose.pt")  # independent of cwd
 
 
 def select_player(tracks: dict[int, list[tuple[int, float, np.ndarray]]], n_frames: int) -> np.ndarray:
