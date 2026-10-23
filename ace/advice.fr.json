@@ -1,0 +1,22 @@
+{
+  "late_prep": {
+    "title": "Tu prépares trop tard",
+    "text": "Tes épaules finissent de tourner juste avant l'impact : tu frappes en retard et la balle part dans le filet ou trop court.",
+    "drill": "Au panier : tourne les épaules dès que la balle passe le filet, avant même qu'elle rebondisse. 20 coups droits « épaule d'abord »."
+  },
+  "small_turn": {
+    "title": "Tes épaules tournent trop peu",
+    "text": "Tu restes presque de face au moment de préparer le coup : tu n'utilises que le bras, la balle manque de puissance et de profondeur.",
+    "drill": "Prépare la raquette en pointant l'épaule de ton bras non frappeur vers la balle, jusqu'à ce que ton dos soit presque tourné au filet. 20 balles lentes en exagérant la rotation."
+  },
+  "straight_legs": {
+    "title": "Tu frappes les jambes tendues",
+    "text": "Tes genoux restent presque droits pendant le coup : tu perds de l'élan venu du sol et tu te fatigues plus vite du bras.",
+    "drill": "Fléchis les genoux en préparant le coup puis pousse vers le haut à la frappe. 3 séries de 10 balles en disant « plie » à voix haute à chaque préparation."
+  },
+  "narrow_stance": {
+    "title": "Tes appuis sont trop serrés",
+    "text": "Tes pieds sont proches l'un de l'autre à l'impact : tu es instable et tu ne peux pas transférer ton poids vers l'avant.",
+    "drill": "Pose un cône à la largeur de tes épaules plus un pied de chaque côté et place tes pieds de part et d'autre avant chaque frappe. 20 coups droits puis 20 revers."
+  }
+}
