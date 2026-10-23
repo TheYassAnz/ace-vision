@@ -62,6 +62,14 @@ class Finding(BaseModel):
     clip_times: list[float]
 
 
+class Score(BaseModel):
+    n_notes: int
+    n_detected: int
+    found_rate: float
+    class_rate: float
+    false_hits: int
+
+
 class Match(BaseModel):
     id: str
     title: str = ""
@@ -75,4 +83,4 @@ class Match(BaseModel):
     strokes: list[Stroke] = Field(default_factory=list)
     rallies: list[Rally] | None = None
     findings: list[Finding] = Field(default_factory=list)
-    score: dict | None = None  # Task 11 retypes to Score
+    score: Score | None = None

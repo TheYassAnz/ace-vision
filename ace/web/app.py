@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Literal
 
@@ -10,6 +11,7 @@ from fastapi.templating import Jinja2Templates
 from ace import store
 from ace.domain import STROKE_LABELS, Match, Settings
 from ace.jobs import runner
+from ace.notes import Note, score_detection
 
 HERE = Path(__file__).parent
 app = FastAPI()
@@ -119,6 +121,20 @@ def video(id: str):
         raise HTTPException(404, "Vidéo introuvable.")
     # Starlette's FileResponse answers Range requests with 206 (needed by Safari).
     return FileResponse(path, media_type="video/quicktime" if path.suffix.lower() == ".mov" else "video/mp4")
+
+
+@app.get("/matchs/{id}/noter")
+def notes_form(request: Request, id: str):
+    return render(request, "notes.html", m=get_match(id))
+
+
+@app.post("/matchs/{id}/notes")
+def notes_save(id: str, notes: list[Note]):
+    m = get_match(id)
+    (store.match_dir(id) / "notes.json").write_text(json.dumps([n.model_dump() for n in notes]))
+    m.score = score_detection(m.strokes, notes)
+    store.save(m)
+    return m.score
 
 
 @app.get("/reglages")

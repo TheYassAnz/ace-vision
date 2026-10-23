@@ -22,3 +22,25 @@ function clipButtons(videoId) {
     stopAt = t + 1.0;
   }));
 }
+
+// Note-taking page: D/R/S/A add a note at the current time, Backspace undoes, Space toggles play.
+function noteStrokes(videoId, url) {
+  const v = document.getElementById(videoId), notes = [];
+  const kinds = { d: "forehand", r: "backhand", s: "serve", a: "other" };
+  const count = () => { document.getElementById("count").textContent = `${notes.length} coup${notes.length > 1 ? "s" : ""} noté${notes.length > 1 ? "s" : ""}`; };
+  document.addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === " ") { e.preventDefault(); v.paused ? v.play() : v.pause(); }
+    else if (e.key === "Backspace") { e.preventDefault(); notes.pop(); count(); }
+    else if (kinds[e.key.toLowerCase()]) { notes.push({ t: v.currentTime, kind: kinds[e.key.toLowerCase()] }); count(); }
+  });
+  document.getElementById("save").addEventListener("click", async () => {
+    const msg = document.getElementById("msg");
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(notes) });
+      if (!r.ok) throw new Error();
+      const s = await r.json();
+      msg.textContent = `Enregistré : ${Math.round(s.found_rate * 100)} % trouvés, ${Math.round(s.class_rate * 100)} % bien classés.`;
+    } catch (e) { msg.textContent = "Échec de l'enregistrement."; }
+  });
+}
