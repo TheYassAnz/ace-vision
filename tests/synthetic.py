@@ -15,8 +15,8 @@ def _right_dir(facing: str) -> float:
     return -1.0 if facing == "camera" else 1.0
 
 
-def make_pose(n_frames: int, facing: str = "camera", handedness: str = "right") -> np.ndarray:
-    """Standing player at rest. `handedness` is accepted for symmetry; the rest pose is symmetric."""
+def make_pose(n_frames: int, facing: str = "camera") -> np.ndarray:
+    """Standing player at rest."""
     d = _right_dir(facing)
     # (joint, dx toward the player's right, y)
     pts = [
@@ -52,5 +52,6 @@ def add_swing(kp, frame, side="right", speed=12.0, two_hands=False, handed="righ
     out = d * (-1.0 if side == "left" else 1.0)  # wiggle goes outward from the body
     pos = np.concatenate([[0.0], pos])  # position at frame-3 .. frame+3
     for i, p in enumerate(pos):
-        kp[frame - 3 + i, wr, 0] += p * out
+        for w in (wr, other) if two_hands else (wr,):  # two hands travel together
+            kp[frame - 3 + i, w, 0] += p * out
     return kp

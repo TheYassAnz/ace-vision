@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from ace.domain import Settings
-from ace.strokes import detect_hits
+from ace.strokes import classify_stroke, detect_hits, detect_strokes
 from ace.geometry import R_WR
 from tests.synthetic import add_swing, make_pose
 
@@ -53,9 +53,6 @@ def test_left_handed_uses_left_wrist():
     assert detect_hits(kp, FPS, LEFT) == []
 
 
-from ace.strokes import classify_stroke, detect_strokes  # noqa: E402
-
-
 def _swing(facing, side, handed="right", two_hands=False):
     kp = make_pose(200, facing=facing)
     add_swing(kp, 100, side, handed=handed, two_hands=two_hands)
@@ -78,8 +75,14 @@ def test_left_hander_mirrors():
 
 
 def test_two_handed_backhand():
-    kp = _swing("away", "left", two_hands=True)
+    # right side of the body: only the two-hand rule can make this a backhand
+    kp = _swing("away", "right", two_hands=True)
     assert classify_stroke(kp, 100, FPS, RIGHT, None) == "backhand"
+
+
+def test_one_handed_swing_right_side_is_forehand_with_two_hand_setting():
+    kp = _swing("away", "right", two_hands=False)
+    assert classify_stroke(kp, 100, FPS, RIGHT, None) == "forehand"
 
 
 def test_overhead_after_pause_is_serve():
