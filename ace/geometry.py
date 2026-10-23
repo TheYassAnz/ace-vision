@@ -21,5 +21,8 @@ def torso_length(kp: np.ndarray) -> float:
 def angle_deg(a, b, c) -> float:
     """Angle at b (degrees) formed by a-b-c."""
     v1, v2 = np.asarray(a, float) - b, np.asarray(c, float) - b
-    cos = v1 @ v2 / (np.linalg.norm(v1) * np.linalg.norm(v2))
+    den = np.linalg.norm(v1) * np.linalg.norm(v2)
+    if not den > 0:  # NaN or zero-length vector: unmeasurable
+        return float('nan')
+    cos = v1 @ v2 / den
     return float(np.degrees(np.arccos(np.clip(cos, -1, 1))))

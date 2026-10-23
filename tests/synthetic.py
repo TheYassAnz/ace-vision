@@ -55,3 +55,25 @@ def add_swing(kp, frame, side="right", speed=12.0, two_hands=False, handed="righ
         for w in (wr, other) if two_hands else (wr,):  # two hands travel together
             kp[frame - 3 + i, w, 0] += p * out
     return kp
+
+
+def set_shoulder_width(kp, frame, width):
+    """Shrink the apparent shoulder width (px, centred on the body) at one frame."""
+    kp[frame, R_SH, 0] = CX + np.sign(kp[0, R_SH, 0] - CX) * width / 2
+    kp[frame, L_SH, 0] = CX + np.sign(kp[0, L_SH, 0] - CX) * width / 2
+    return kp
+
+
+def bend_knees(kp, frames, angle):
+    """Displace both knees sideways so the hip-knee-ankle angle equals `angle` degrees on `frames`."""
+    dx = 80.0 / np.tan(np.radians(angle) / 2)
+    for k in (L_KNEE, R_KNEE):
+        kp[frames, k, 0] += dx
+    return kp
+
+
+def set_stance(kp, frame, ankle_gap):
+    """Set the ankle distance (px) at one frame."""
+    for a in (L_ANK, R_ANK):
+        kp[frame, a, 0] = CX + np.sign(kp[0, a, 0] - CX) * ankle_gap / 2
+    return kp
