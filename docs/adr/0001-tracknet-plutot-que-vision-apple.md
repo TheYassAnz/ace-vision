@@ -1,0 +1,3 @@
+# TrackNet plutôt que Vision d'Apple pour suivre la balle
+
+Pour suivre la balle, on utilise TrackNet (réseau de neurones Python, open source) et non `VNDetectTrajectoriesRequest` de Vision d'Apple. Vision est plus simple à brancher mais n'a aucun résultat publié sur le tennis, attend des objets plus gros (10 à 30 px de rayon pour 1920 px de large dans l'exemple d'Apple) et ne peut pas être réentraîné. TrackNet a fait ses preuves sur le tennis (95,3 % de précision et 75,7 % de rappel en validation croisée, arXiv 1907.03698) et peut être réentraîné sur nos vidéos iPhone, ce qui sera probablement nécessaire : un modèle appliqué hors de son contexte s'effondre (22,9 % de rappel du tennis vers le badminton). Vérifié le 2026-10-23.
