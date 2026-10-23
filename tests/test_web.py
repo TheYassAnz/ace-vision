@@ -72,7 +72,7 @@ def test_running_and_done_pages():
     assert "Analyse en cours" in client.get(f"/matchs/{m.id}").text
     m.status = "done"
     store.save(m)
-    assert "Bilan disponible bientôt" in client.get(f"/matchs/{m.id}").text
+    assert "Vue d'ensemble" in client.get(f"/matchs/{m.id}").text
 
 
 def test_relaunch_redirects(monkeypatch):

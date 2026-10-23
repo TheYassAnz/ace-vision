@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ m.title or m.id }} — Ace Vision{% endblock %}
+{% block content %}
+<style>
+.cards{display:flex;gap:10px;flex-wrap:wrap}.card{flex:1;min-width:140px;background:#fff;border-radius:8px;padding:12px}
+.card b{display:block;font-size:1.5rem}.advice{background:#fff;border-radius:8px;padding:12px 16px;margin:10px 0}
+.clips button{margin:4px 6px 0 0}video{width:100%;max-height:70vh;background:#000;border-radius:8px}
+</style>
+<h1>{{ m.title or m.id }}</h1>
+<p>{{ view_labels[m.view] }}</p>
+{% if m.score %}<p>Fiabilité : {{ (m.score.found_rate * 100)|round|int }} % de tes coups trouvés, {{ (m.score.class_rate * 100)|round|int }} % bien classés</p>{% endif %}
+<p><a href="/matchs/{{ m.id }}/noter">Noter mes coups</a></p>
+
+<video id="player" controls playsinline src="/matchs/{{ m.id }}/video"></video>
+
+<h2>Vue d'ensemble</h2>
+<div class="cards">
+{% for k, label in stroke_labels.items() %}<div class="card"><b>{{ counts[k] }}</b>{{ label }}</div>{% endfor %}
+{% if rallies %}
+<div class="card"><b>{{ rallies.n }}</b>échanges</div>
+<div class="card"><b>{{ rallies.mean }}</b>coups en moyenne (max {{ rallies.max }})</div>
+{% endif %}
+</div>
+
+{% if rallies %}
+<h2>Où ça casse</h2>
+<p>La carte du court et le détail des fautes arrivent bientôt.</p>
+{% else %}
+<h2>Où ça casse</h2>
+<p>Disponible en vue arrière : filme depuis derrière toi, en paysage et en 60 i/s, pour voir où finissent tes balles.</p>
+{% endif %}
+
+<h2>Conseils</h2>
+{% for f in m.findings %}
+<div class="advice">
+<h3>{{ f.title }}</h3>
+<p><strong>{{ of_total(f.count, f.total, f.kind) }}</strong></p>
+<p>{{ f.text }}</p>
+<p><em>À essayer :</em> {{ f.drill }}</p>
+<div class="clips">{% for t in f.clip_times %}<button type="button" data-t="{{ t }}">Extrait ▶ {{ '%d:%02d'|format(t // 60, t % 60) }}</button>{% endfor %}</div>
+</div>
+{% else %}
+<p>Aucun défaut ne revient assez souvent sur ce match pour en tirer un conseil.</p>
+{% endfor %}
+
+<details>
+<summary>Tous mes coups</summary>
+<table>
+<tr><th>Temps</th><th>Type</th><th>Défauts</th></tr>
+{% for s in m.strokes %}<tr><td>{{ '%d:%02d'|format(s.t // 60, s.t % 60) }}</td><td>{{ stroke_labels[s.kind] }}</td><td>{% for d in s.defects %}{{ defect_labels[d] }}{{ ', ' if not loop.last }}{% endfor %}</td></tr>{% endfor %}
+</table>
+</details>
+<script src="/static/app.js"></script>
+<script>clipButtons("player");</script>
+{% endblock %}

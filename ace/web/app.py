@@ -33,6 +33,23 @@ STATUS_LABELS = {"pending": "Pas encore analysé", "running": "En cours", "done"
 QUEUED_MSG = "Une analyse est déjà en cours. Celle-ci démarrera quand tu cliqueras sur Relancer."
 
 
+PLURALS = {"forehand": "coups droits", "backhand": "revers", "serve": "services", "other": "autres"}
+SINGULARS = {"forehand": "coup droit", "backhand": "revers", "serve": "service", "other": "autre"}
+DEFECT_LABELS = {"late_prep": "Préparation tardive", "small_turn": "Épaules peu tournées",
+                 "straight_legs": "Jambes tendues", "narrow_stance": "Appuis serrés"}
+
+
+def of_total(count: int, total: int, kind: str) -> str:
+    return f"{count} {(SINGULARS if total < 2 else PLURALS)[kind]} sur {total}"
+
+
+def rally_summary(m: Match) -> dict | None:
+    if m.view != "rear" or m.rallies is None:
+        return None
+    long = [r.n_hits for r in m.rallies if r.n_hits >= 2]  # a lone hit is not an exchange length
+    return {"n": len(m.rallies), "mean": f"{sum(long) / len(long):.1f}".replace(".", ",") if long else "—", "max": max(long, default="—")}
+
+
 def render(request: Request, name: str, **ctx):
     return templates.TemplateResponse(request, name, {"view_labels": VIEW_LABELS, "stroke_labels": STROKE_LABELS, **ctx})
 
@@ -74,9 +91,10 @@ def create(request: Request, video: UploadFile = File(...), view: Literal["net",
 @app.get("/matchs/{id}")
 def match_page(request: Request, id: str, attente: int = 0):
     m = get_match(id)
-    # Single status dispatch: Task 10 swaps the "done" template.
-    page = {"running": "match_running.html", "done": "match_done.html"}.get(m.status, "match_failed.html")
-    return render(request, page, m=m, queued_msg=QUEUED_MSG if attente else None)
+    page = {"running": "match_running.html", "done": "match_report.html"}.get(m.status, "match_failed.html")
+    counts = {k: sum(s.kind == k for s in m.strokes) for k in STROKE_LABELS}
+    return render(request, page, m=m, queued_msg=QUEUED_MSG if attente else None, counts=counts,
+                  rallies=rally_summary(m), of_total=of_total, defect_labels=DEFECT_LABELS)
 
 
 @app.get("/matchs/{id}/statut")
