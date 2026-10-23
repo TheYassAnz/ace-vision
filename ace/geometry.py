@@ -14,7 +14,8 @@ def torso_length(kp: np.ndarray) -> float:
     """Median over the video of the distance shoulder-midpoint -> hip-midpoint; kp is (n, 17, >=2)."""
     sh = (kp[:, L_SH, :2] + kp[:, R_SH, :2]) / 2
     hip = (kp[:, L_HIP, :2] + kp[:, R_HIP, :2]) / 2
-    return float(np.nanmedian(np.linalg.norm(sh - hip, axis=1)))
+    d = np.linalg.norm(sh - hip, axis=1)
+    return float(np.nanmedian(d)) if not np.isnan(d).all() else float('nan')
 
 
 def angle_deg(a, b, c) -> float:
