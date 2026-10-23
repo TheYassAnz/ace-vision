@@ -49,7 +49,8 @@ def add_swing(kp, frame, side="right", speed=12.0, two_hands=False, handed="righ
     step = SHAPE * speed / 0.9 * 100.0 / FPS
     sign = np.array([1, 1, 1, -1, -1, -1])
     pos = np.cumsum(sign * step)
+    out = d * (-1.0 if side == "left" else 1.0)  # wiggle goes outward from the body
     pos = np.concatenate([[0.0], pos])  # position at frame-3 .. frame+3
     for i, p in enumerate(pos):
-        kp[frame - 3 + i, wr, 0] += p
+        kp[frame - 3 + i, wr, 0] += p * out
     return kp
