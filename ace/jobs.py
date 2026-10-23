@@ -16,9 +16,14 @@ class JobRunner:
         with self._lock:
             if self.running_id is not None:
                 return False
-            self.running_id = match_id
-            self._thread = threading.Thread(target=self._run, args=(match_id,), daemon=True)
-            self._thread.start()
+            t = threading.Thread(target=self._run, args=(match_id,), daemon=True)
+            self.running_id = match_id  # before start(): _run clears it when done
+            try:
+                t.start()
+            except Exception:
+                self.running_id = None
+                raise
+            self._thread = t
             return True
 
     def _run(self, match_id: str) -> None:

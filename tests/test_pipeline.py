@@ -73,6 +73,28 @@ def test_recover_interrupted(match):
     assert m.status == "failed" and m.error == "Analyse interrompue (l'app a été fermée)."
 
 
+def test_recover_skips_corrupt_match(match):
+    other = store.create_match(io.BytesIO(b"y"), "b.mov", "net", "")
+    other.status = "running"
+    store.save(other)
+    (store.match_dir(match.id) / "match.json").write_text("{not json")
+    jobs.recover_interrupted()
+    assert store.load(other.id).status == "failed"
+
+
+def test_failed_retry_clears_stale_results_and_empty_message(match, monkeypatch):
+    monkeypatch.setattr(pipeline, "extract_pose", _fake_pose)
+    pipeline.analyse(match.id)
+
+    def boom(*a):
+        raise RuntimeError()
+
+    monkeypatch.setattr(pipeline, "extract_pose", boom)
+    pipeline.analyse(match.id)
+    m = store.load(match.id)
+    assert m.status == "failed" and m.strokes == [] and m.error == "L'analyse a échoué : RuntimeError"
+
+
 @pytest.mark.slow
 @pytest.mark.skipif(not REAL.exists(), reason="sample video missing")
 def test_analyse_real_video(monkeypatch):

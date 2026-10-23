@@ -67,3 +67,44 @@ def test_load_rejects_traversal():
     for bad in ("../x", "..", "2026-03-04-../x"):
         with pytest.raises(ValueError):
             store.load(bad)
+
+
+def test_concurrent_imports_keep_own_content():
+    import threading
+    ms = {}
+
+    def go(n):
+        ms[n] = store.create_match(io.BytesIO(n.encode() * 1000), f"{n}.mov", "net", "")
+
+    ts = [threading.Thread(target=go, args=(n,)) for n in ("a", "b", "c")]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    for n, m in ms.items():
+        assert (store.match_dir(m.id) / m.video_file).read_bytes() == n.encode() * 1000
+
+
+def test_import_of_running_match_refused():
+    m = store.create_match(io.BytesIO(b"a"), "a.mov", "net", "")
+    m.status = "running"
+    store.save(m)
+    with pytest.raises(ValueError, match="en cours d'analyse"):
+        store.create_match(io.BytesIO(b"b"), "a.mov", "net", "")
+    assert (store.match_dir(m.id) / m.video_file).read_bytes() == b"a"
+
+
+def test_concurrent_saves_never_raise():
+    import threading
+    m = store.create_match(io.BytesIO(b"a"), "a.mov", "net", "")
+    errs = []
+
+    def go():
+        try:
+            for _ in range(50):
+                store.save(m)
+        except Exception as e:
+            errs.append(e)
+
+    ts = [threading.Thread(target=go) for _ in range(4)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert errs == []

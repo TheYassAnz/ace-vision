@@ -1,6 +1,8 @@
 import os
 import re
 import shutil
+import tempfile
+import threading
 from datetime import date
 from pathlib import Path
 from typing import BinaryIO
@@ -8,7 +10,10 @@ from typing import BinaryIO
 from ace.domain import Match, Settings, View
 from ace.video import probe
 
-DATA_DIR = Path("data")  # overridden at call time by ACE_DATA_DIR
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"  # overridden at call time by ACE_DATA_DIR
+
+
+_lock = threading.RLock()  # serialises match.json writes and re-imports
 
 
 def _root() -> Path:
@@ -34,13 +39,14 @@ def pose_path(id: str) -> Path:
 
 
 def _write_atomic(path: Path, text: str) -> None:
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(text)
-    os.replace(tmp, path)
+    with tempfile.NamedTemporaryFile("w", dir=path.parent, suffix=".tmp", delete=False) as f:
+        f.write(text)
+    os.replace(f.name, path)
 
 
 def save(m: Match) -> None:
-    _write_atomic(match_dir(m.id) / "match.json", m.model_dump_json(indent=1))
+    with _lock:
+        _write_atomic(match_dir(m.id) / "match.json", m.model_dump_json(indent=1))
 
 
 def load(id: str) -> Match:
@@ -49,7 +55,13 @@ def load(id: str) -> Match:
 
 def list_matches() -> list[Match]:
     files = sorted((_root() / "matchs").glob("*/match.json"), key=lambda f: f.stat().st_mtime, reverse=True)
-    return [Match.model_validate_json(f.read_text()) for f in files]
+    out = []
+    for f in files:
+        try:
+            out.append(Match.model_validate_json(f.read_text()))
+        except (OSError, ValueError):  # unreadable match.json: skip, don't hide the others
+            continue
+    return out
 
 
 def load_settings() -> Settings:
@@ -70,20 +82,25 @@ def create_match(src: BinaryIO, filename: str, view: View, title: str) -> Match:
     name = "video" + ext  # never the raw upload name
     tmp_dir = _root() / "incoming"
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    tmp = tmp_dir / name
-    with tmp.open("wb") as out:
-        shutil.copyfileobj(src, out, 1024 * 1024)
+    fd, tmp_name = tempfile.mkstemp(dir=tmp_dir, suffix=ext)  # unique per call
+    tmp = Path(tmp_name)
     try:
+        with os.fdopen(fd, "wb") as out:
+            shutil.copyfileobj(src, out, 1024 * 1024)
         info = probe(tmp)
         created = (info.created or "")[:10]
         day = created if re.fullmatch(r"\d{4}-\d{2}-\d{2}", created) else date.today().isoformat()
-        slug = re.sub(r"[^0-9a-z]+", "-", Path(filename).stem.lower()).strip("-") or "match"
+        slug = re.sub(r"[^0-9a-z]+", "-", Path(filename).stem.lower())[:60].strip("-") or "match"
         id = f"{day}-{slug}"
-        match_dir(id).mkdir(parents=True, exist_ok=True)
-        shutil.move(tmp, match_dir(id) / name)
+        with _lock:
+            d = match_dir(id)
+            d.mkdir(parents=True, exist_ok=True)
+            if (d / "match.json").exists() and load(id).status == "running":
+                raise ValueError("Ce match est en cours d'analyse.")
+            shutil.move(tmp, d / name)
+            pose_path(id).unlink(missing_ok=True)
+            m = Match(id=id, title=title, view=view, video_file=name, info=info, settings=load_settings())
+            save(m)
     finally:
         tmp.unlink(missing_ok=True)
-    pose_path(id).unlink(missing_ok=True)
-    m = Match(id=id, title=title, view=view, video_file=name, info=info, settings=load_settings())
-    save(m)
     return m

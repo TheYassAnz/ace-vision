@@ -1,3 +1,4 @@
+import logging
 import math
 import time
 
@@ -10,14 +11,17 @@ from ace.strokes import detect_strokes
 from ace.technique import detect_defects, measure, ref_shoulder_width
 from ace.video import probe
 
+log = logging.getLogger(__name__)
 POSE_SHARE = 0.9  # pose extraction covers progress 0 -> 0.9
 SAVE_EVERY_S = 2.0
 
 
 def analyse(match_id: str) -> None:
-    m = store.load(match_id)
+    m = None
     try:
+        m = store.load(match_id)
         m.status, m.progress, m.error = "running", 0.0, None
+        m.strokes, m.findings, m.rallies = [], [], None
         m.settings = store.load_settings()
         store.save(m)
         info = probe(store.match_dir(match_id) / m.video_file)
@@ -43,5 +47,11 @@ def analyse(match_id: str) -> None:
         m.rallies = None  # net view: rallies not computable (rear view handled by a later task)
         m.status, m.progress = "done", 1.0
     except Exception as e:
-        m.status, m.error = "failed", f"L'analyse a échoué : {e}"
-    store.save(m)
+        if m is None:
+            log.exception("analysis of %s failed before loading the match", match_id)
+            return
+        m.status, m.error = "failed", f"L'analyse a échoué : {str(e) or type(e).__name__}"
+    try:
+        store.save(m)
+    except Exception:
+        log.exception("could not save analysis result of %s", match_id)
