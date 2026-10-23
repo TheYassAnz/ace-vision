@@ -1,4 +1,6 @@
-from ace.domain import Finding, Stroke
+from typing import get_args
+
+from ace.domain import DefectId, Finding, Stroke
 from ace.findings import build_findings, load_advice
 
 ADVICE = {d: {"title": f"T-{d}", "text": "x", "drill": "y"} for d in ("late_prep", "small_turn", "straight_legs", "narrow_stance")}
@@ -39,5 +41,5 @@ def test_clip_times():
 
 def test_advice_file_complete():
     advice = load_advice()
-    assert set(advice) == set(ADVICE)
+    assert set(advice) == set(get_args(DefectId))
     assert all(advice[d][k].strip() for d in advice for k in ("title", "text", "drill"))

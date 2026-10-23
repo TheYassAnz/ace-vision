@@ -2,7 +2,7 @@
   "late_prep": {
     "title": "Tu prépares trop tard",
     "text": "Tes épaules finissent de tourner juste avant l'impact : tu frappes en retard et la balle part dans le filet ou trop court.",
-    "drill": "Au panier : tourne les épaules dès que la balle passe le filet, avant même qu'elle rebondisse. 20 coups droits « épaule d'abord »."
+    "drill": "Au panier : tourne les épaules dès que la balle passe le filet, avant même qu'elle rebondisse. 20 balles « épaule d'abord », en coup droit puis en revers."
   },
   "small_turn": {
     "title": "Tes épaules tournent trop peu",
@@ -17,6 +17,6 @@
   "narrow_stance": {
     "title": "Tes appuis sont trop serrés",
     "text": "Tes pieds sont proches l'un de l'autre à l'impact : tu es instable et tu ne peux pas transférer ton poids vers l'avant.",
-    "drill": "Pose un cône à la largeur de tes épaules plus un pied de chaque côté et place tes pieds de part et d'autre avant chaque frappe. 20 coups droits puis 20 revers."
+    "drill": "Pose deux cônes écartés d'environ 1,5 fois la largeur de tes hanches. À chaque frappe, garde un pied de chaque côté, au niveau des cônes. 20 coups droits puis 20 revers."
   }
 }

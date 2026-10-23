@@ -9,6 +9,7 @@ _APPLICABLE: dict[StrokeKind, list[DefectId]] = {
     "forehand": list(THRESHOLDS), "backhand": list(THRESHOLDS), "serve": ["straight_legs"], "other": [],
 }
 _NAN = float('nan')
+MIN_COVERAGE = 0.5  # share of valid frames a windowed metric needs, else NaN
 
 
 def _width(kp: np.ndarray, left: int, right: int) -> np.ndarray:
@@ -24,14 +25,15 @@ def measure(kp: np.ndarray, frame: int, fps: float, ref_shoulder: float) -> dict
     out = {"turn_ratio": _NAN, "prep_lead_s": _NAN, "knee_angle_min": _NAN, "stance_ratio": _NAN}
     lo = max(0, frame - round(1.0 * fps))
     w = _width(kp[lo:frame + 1], L_SH, R_SH) / ref_shoulder  # NaN ref -> all NaN
-    if not np.isnan(w).all():
+    if np.isfinite(w).mean() >= MIN_COVERAGE:
         i = int(np.nanargmin(w))
         out["turn_ratio"], out["prep_lead_s"] = float(w[i]), (frame - (lo + i)) / fps
-    knees = [angle_deg(kp[f, h, :2], kp[f, k, :2], kp[f, a, :2])
-             for f in range(max(0, frame - round(0.5 * fps)), frame + 1)
-             for h, k, a in ((L_HIP, L_KNEE, L_ANK), (R_HIP, R_KNEE, R_ANK))]
-    if not np.isnan(knees).all():
-        out["knee_angle_min"] = float(np.nanmin(knees))
+    per_frame = [min((a for a in (angle_deg(kp[f, h, :2], kp[f, k, :2], kp[f, an, :2])
+                                  for h, k, an in ((L_HIP, L_KNEE, L_ANK), (R_HIP, R_KNEE, R_ANK))) if a == a),
+                     default=_NAN)  # best of the complete legs
+                 for f in range(max(0, frame - round(0.5 * fps)), frame + 1)]
+    if np.isfinite(per_frame).mean() >= MIN_COVERAGE:
+        out["knee_angle_min"] = float(np.nanmin(per_frame))
     hips = _width(kp[frame], L_HIP, R_HIP)
     if hips > 0:  # NaN or zero -> unmeasurable
         out["stance_ratio"] = float(_width(kp[frame], L_ANK, R_ANK) / hips)

@@ -1,6 +1,7 @@
 import numpy as np
+import pytest
 
-from ace.geometry import L_ANK
+from ace.geometry import L_ANK, L_SH, R_ANK
 from ace.technique import THRESHOLDS, detect_defects, measure, ref_shoulder_width
 from tests.synthetic import FPS, bend_knees, make_pose, set_shoulder_width, set_stance
 
@@ -19,7 +20,7 @@ def test_late_preparation():
     late, early = pose(), pose()
     set_shoulder_width(late, IMPACT - 6, 40)  # 0.2 s before impact
     set_shoulder_width(early, IMPACT - 18, 40)  # 0.6 s before impact
-    assert metrics(late)["prep_lead_s"] == 0.2 and "late_prep" in detect_defects(metrics(late), "forehand")
+    assert metrics(late)["prep_lead_s"] == pytest.approx(0.2) and "late_prep" in detect_defects(metrics(late), "forehand")
     assert "late_prep" not in detect_defects(metrics(early), "forehand")
 
 
@@ -43,7 +44,7 @@ def test_narrow_stance():
     narrow, wide = pose(), pose()
     set_stance(narrow, IMPACT, 72)  # 1.2 x hip width
     set_stance(wide, IMPACT, 120)  # 2.0 x
-    assert metrics(narrow)["stance_ratio"] == 1.2
+    assert metrics(narrow)["stance_ratio"] == pytest.approx(1.2)
     assert "narrow_stance" in detect_defects(metrics(narrow), "forehand")
     assert "narrow_stance" not in detect_defects(metrics(wide), "forehand")
 
@@ -66,3 +67,13 @@ def test_serve_only_legs():
     m = {"prep_lead_s": 0.0, "turn_ratio": 1.0, "knee_angle_min": 180.0, "stance_ratio": 0.5}
     assert detect_defects(m, "serve") == ["straight_legs"]
     assert set(detect_defects(m, "forehand")) == set(THRESHOLDS)
+
+
+def test_sparse_window_gives_nan_not_defect():
+    kp = pose()
+    kp[IMPACT - 30:IMPACT, L_SH] = np.nan  # shoulders valid only at impact frame
+    kp[IMPACT - 30:IMPACT, L_ANK] = np.nan  # legs valid only at impact frame
+    kp[IMPACT - 30:IMPACT, R_ANK] = np.nan
+    m = metrics(kp)
+    assert np.isnan(m["turn_ratio"]) and np.isnan(m["prep_lead_s"]) and np.isnan(m["knee_angle_min"])
+    assert not {"late_prep", "small_turn", "straight_legs"} & set(detect_defects(m, "forehand"))
