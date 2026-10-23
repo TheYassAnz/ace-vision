@@ -1,6 +1,6 @@
 # ACE Vision
 
-Application locale pour Mac qui analyse des vidéos de tennis filmées à l'iPhone. Elle repère chaque coup (coup droit, revers, service), regroupe les échanges, calcule un bilan du match et signale les défauts de technique les plus fréquents avec des conseils. Tout tourne sur votre Mac : rien n'est envoyé sur Internet.
+Application locale pour Mac qui analyse des vidéos de tennis filmées à l'iPhone. Elle repère chaque coup (coup droit, revers, service), calcule un bilan du match et signale les défauts de technique les plus fréquents avec des conseils. Tout tourne sur votre Mac : rien n'est envoyé sur Internet.
 
 ## Installation
 
@@ -15,8 +15,8 @@ Double-cliquez sur `ACE Vision.command`. macOS peut demander l'autorisation d'ou
 
 ## Filmer
 
-- **Vue filet** et **vue arrière** : iPhone en **paysage**, **60 images/s**.
-- Vue arrière : placez-vous **derrière soi, en hauteur** (par exemple au fond du court, sur un point haut).
+- **Vue filet** : iPhone près du filet, tourné vers vous (vous de face, en entier) ; portrait ou paysage, 30 ou 60 images/s.
+- **Vue arrière** : iPhone en **paysage**, **60 images/s**, placé **derrière soi, en hauteur** (par exemple au fond du court, sur un point haut).
 - Choisissez la vue à l'import ; elle n'est pas détectée automatiquement.
 
 ## Assembler plusieurs vidéos d'un match
@@ -45,7 +45,7 @@ Les journaux sont dans `data/server.log`.
 
 ## Données
 
-Chaque match est copié dans `data/matchs/<id>/`. Ce dossier n'est pas versionné. L'application ne supprime jamais rien.
+Chaque match est copié dans `data/matchs/<id>/`. Ce dossier n'est pas versionné. L'application n'a pas de bouton de suppression, mais importer à nouveau la même vidéo (même nom) remplace la copie et l'analyse précédentes ; si la vidéo a changé, les coups notés sont aussi effacés.
 
 ## Calibration
 
