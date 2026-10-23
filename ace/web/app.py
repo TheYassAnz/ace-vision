@@ -1,8 +1,9 @@
-import json
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from pydantic import Field
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -28,6 +29,11 @@ async def same_origin_only(request: Request, call_next):  # CSRF: browsers alway
     return await call_next(request)
 
 
+@app.exception_handler(RequestValidationError)
+async def invalid_request(request: Request, exc: RequestValidationError):  # default body echoes the input, which breaks on NaN
+    return JSONResponse({"detail": "Requête invalide."}, status_code=422)
+
+
 app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 VIEW_LABELS = {"net": "Vue filet", "rear": "Vue arrière"}
@@ -42,7 +48,7 @@ DEFECT_LABELS = {"late_prep": "Préparation tardive", "small_turn": "Épaules pe
 
 
 def of_total(count: int, total: int, kind: str) -> str:
-    return f"{count} {(SINGULARS if total < 2 else PLURALS)[kind]} sur {total}"
+    return f"{count} {(SINGULARS if count < 2 else PLURALS)[kind]} sur {total}"
 
 
 def rally_summary(m: Match) -> dict | None:
@@ -129,9 +135,14 @@ def notes_form(request: Request, id: str):
 
 
 @app.post("/matchs/{id}/notes")
-def notes_save(id: str, notes: list[Note]):
+def notes_save(id: str, notes: Annotated[list[Note], Field(min_length=1, max_length=5000)]):
     m = get_match(id)
-    (store.match_dir(id) / "notes.json").write_text(json.dumps([n.model_dump() for n in notes]))
+    if m.status == "running":
+        return JSONResponse({"detail": "Une analyse est en cours : réessaie quand elle est terminée."}, status_code=409)
+    limit = m.info.duration_s if m.info else 86400
+    if any(n.t > limit for n in notes):
+        return JSONResponse({"detail": "Une note dépasse la durée de la vidéo."}, status_code=422)
+    store.save_notes(id, notes)
     m.score = score_detection(m.strokes, notes)
     store.save(m)
     return m.score

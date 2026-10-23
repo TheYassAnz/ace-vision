@@ -18,7 +18,7 @@ function clipButtons(videoId) {
   document.querySelectorAll("[data-t]").forEach((b) => b.addEventListener("click", () => {
     const t = parseFloat(b.dataset.t);
     v.currentTime = Math.max(0, t - 1.5);
-    v.play();
+    v.play().catch(() => {});
     stopAt = t + 1.0;
   }));
 }
@@ -29,8 +29,8 @@ function noteStrokes(videoId, url) {
   const kinds = { d: "forehand", r: "backhand", s: "serve", a: "other" };
   const count = () => { document.getElementById("count").textContent = `${notes.length} coup${notes.length > 1 ? "s" : ""} noté${notes.length > 1 ? "s" : ""}`; };
   document.addEventListener("keydown", (e) => {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key === " ") { e.preventDefault(); v.paused ? v.play() : v.pause(); }
+    if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || e.target.closest("input,textarea,select,button")) return;
+    if (e.key === " ") { e.preventDefault(); v.paused ? v.play().catch(() => {}) : v.pause(); }
     else if (e.key === "Backspace") { e.preventDefault(); notes.pop(); count(); }
     else if (kinds[e.key.toLowerCase()]) { notes.push({ t: v.currentTime, kind: kinds[e.key.toLowerCase()] }); count(); }
   });

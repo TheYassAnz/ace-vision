@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import shutil
@@ -8,6 +9,7 @@ from pathlib import Path
 from typing import BinaryIO
 
 from ace.domain import Match, Settings, View
+from ace.notes import Note
 from ace.video import probe
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"  # overridden at call time by ACE_DATA_DIR
@@ -62,6 +64,15 @@ def list_matches() -> list[Match]:
         except (OSError, ValueError):  # unreadable match.json: skip, don't hide the others
             continue
     return out
+
+
+def save_notes(id: str, notes: list) -> None:
+    _write_atomic(match_dir(id) / "notes.json", json.dumps([n.model_dump() for n in notes]))
+
+
+def load_notes(id: str) -> list | None:
+    f = match_dir(id) / "notes.json"
+    return [Note.model_validate(n) for n in json.loads(f.read_text())] if f.exists() else None
 
 
 def load_settings() -> Settings:

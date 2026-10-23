@@ -6,6 +6,7 @@ import numpy as np
 
 from ace import store
 from ace.findings import build_findings, load_advice
+from ace.notes import score_detection
 from ace.pose import extract_pose
 from ace.strokes import detect_strokes
 from ace.technique import detect_defects, measure, ref_shoulder_width
@@ -21,7 +22,7 @@ def analyse(match_id: str) -> None:
     try:
         m = store.load(match_id)
         m.status, m.progress, m.error = "running", 0.0, None
-        m.strokes, m.findings, m.rallies = [], [], None
+        m.strokes, m.findings, m.rallies, m.score = [], [], None, None
         m.settings = store.load_settings()
         store.save(m)
         info = probe(store.match_dir(match_id) / m.video_file)
@@ -44,6 +45,8 @@ def analyse(match_id: str) -> None:
                 s.metrics = measure(kp, s.frame, info.fps, ref)
                 s.defects = detect_defects(s.metrics, s.kind)
         m.findings = build_findings(m.strokes, load_advice())
+        notes = store.load_notes(match_id)  # the player's earlier notes still apply to the new strokes
+        m.score = score_detection(m.strokes, notes) if notes else None
         m.rallies = None  # net view: rallies not computable (rear view handled by a later task)
         m.status, m.progress = "done", 1.0
     except Exception as e:

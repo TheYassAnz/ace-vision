@@ -67,3 +67,38 @@ def test_notes_endpoint_saves_score(env):
     assert json.loads((store.match_dir(m.id) / "notes.json").read_text())[0]["t"] == 1.1
     assert "Fiabilité : 50 % de tes coups trouvés, 100 % bien classés" in client.get(f"/matchs/{m.id}").text
     assert client.post(f"/matchs/{m.id}/notes", json=[{"t": 1, "kind": "nope"}]).status_code == 422
+
+
+def test_notes_validation_and_running_guard(env):
+    client = TestClient(app, base_url="http://127.0.0.1:8765", headers={"Origin": "http://127.0.0.1:8765"})
+    m = store.create_match(io.BytesIO(b"x"), "IMG_1.mov", "net", "")
+    url = f"/matchs/{m.id}/notes"
+    for body in ('[{"t": NaN, "kind": "forehand"}]', '[{"t": -1, "kind": "forehand"}]', '[]', '[{"t": 999, "kind": "forehand"}]'):
+        assert client.post(url, content=body, headers={"Content-Type": "application/json"}).status_code == 422
+    m.status = "running"
+    store.save(m)
+    assert client.post(url, json=[{"t": 1, "kind": "forehand"}]).status_code == 409
+
+
+def test_plural_keys_on_count():
+    from ace.web.app import of_total
+    assert of_total(1, 25, "forehand") == "1 coup droit sur 25" and of_total(11, 25, "forehand") == "11 coups droits sur 25"
+
+
+def test_reanalysis_recomputes_score(env, monkeypatch):
+    from ace import pipeline
+    from ace.domain import Score
+    m = store.create_match(io.BytesIO(b"x"), "IMG_1.mov", "net", "")
+    m.score = Score(n_notes=9, n_detected=9, found_rate=1, class_rate=1, false_hits=0)
+    store.save(m)
+    monkeypatch.setattr(pipeline, "probe", lambda p: m.info)
+    monkeypatch.setattr(pipeline, "extract_pose", lambda *a: None)
+    monkeypatch.setattr(pipeline.np, "savez_compressed", lambda *a, **k: None)
+    monkeypatch.setattr(pipeline, "detect_strokes", lambda *a: [S(1)])
+    monkeypatch.setattr(pipeline, "ref_shoulder_width", lambda kp: float("nan"))
+    monkeypatch.setattr(pipeline, "load_advice", lambda: {})
+    pipeline.analyse(m.id)
+    assert store.load(m.id).status == "done" and store.load(m.id).score is None
+    store.save_notes(m.id, [Note(t=1, kind="forehand")])
+    pipeline.analyse(m.id)
+    assert store.load(m.id).score.found_rate == 1.0
