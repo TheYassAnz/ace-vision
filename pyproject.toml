@@ -2,7 +2,17 @@
 name = "ace-vision"
 version = "0.1.0"
 requires-python = "==3.12.*"
-dependencies = ["fastapi", "uvicorn", "jinja2", "python-multipart", "ultralytics", "numpy", "scipy", "pydantic"]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "jinja2",
+    "python-multipart",
+    "ultralytics",
+    "numpy",
+    "scipy",
+    "pydantic",
+    "lap>=0.5.13",
+]
 
 [dependency-groups]
 dev = ["pytest", "httpx"]
