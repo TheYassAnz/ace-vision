@@ -20,7 +20,7 @@ struct PlayerView: View {
             PlayerSurface(player: model.player, pose: showSkeleton ? pose : nil,
                           videoSize: CGSize(width: match.info?.width ?? 0, height: match.info?.height ?? 0), fps: match.info?.fps ?? 0)
                 .frame(maxWidth: .infinity)
-                .frame(height: 260)
+                .containerRelativeFrame(.vertical) { h, _ in max(260, h * 0.55) }
             if match.strokes.isEmpty {
                 Text("Aucun coup détecté sur ce match.").foregroundStyle(.secondary)
             } else {
