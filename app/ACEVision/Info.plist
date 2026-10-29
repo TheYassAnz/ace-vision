@@ -20,6 +20,19 @@
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Vidéo</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.movie</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>ACE Vision lit les vidéos de match que tu choisis dans Photos.</string>
 </dict>
