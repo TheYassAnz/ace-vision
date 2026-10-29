@@ -4,11 +4,11 @@ Application locale pour Mac qui analyse des vidéos de tennis filmées à l'iPho
 
 ## Installation
 
-1. Téléchargez `ACE-Vision-<version>.zip` depuis la dernière [release](../../releases), décompressez-le et glissez **ACE Vision** dans Applications.
-2. L'app n'est pas signée par Apple : la première fois, faites un clic droit sur l'app puis **Ouvrir**, ou dans le Terminal :
+1. Téléchargez `ACE-Vision-<version>.zip` depuis la dernière [release](../../releases), ouvrez-le d'un double-clic dans le Finder (ou `ditto -x -k ACE-Vision-<version>.zip .` dans le Terminal ; pas `unzip`, qui casse la signature) et glissez **ACE Vision** dans Applications.
+2. L'app n'est pas signée par Apple : la première fois, faites un clic droit sur l'app dans Applications puis **Ouvrir**, ou, une fois l'app dans Applications, dans le Terminal :
 
 ```
-xattr -dr com.apple.quarantine "ACE Vision.app"
+xattr -dr com.apple.quarantine /Applications/ACE\ Vision.app
 ```
 
 3. Installez ffmpeg (fournit `ffprobe`) :
@@ -19,10 +19,10 @@ brew install ffmpeg
 
 Au premier lancement, l'app installe le moteur d'analyse et télécharge le modèle de détection (environ 1 Go, connexion Internet nécessaire). Ensuite, tout tourne hors ligne.
 
-Pour reprendre des matchs analysés avec l'ancienne version en ligne de commande :
+Pour reprendre des matchs analysés avec l'ancienne version en ligne de commande, quittez l'app puis lancez depuis le dossier du dépôt :
 
 ```
-mv data/matchs ~/Library/Application\ Support/ACE\ Vision/data/
+mkdir -p ~/Library/Application\ Support/ACE\ Vision/data/matchs && mv data/matchs/* ~/Library/Application\ Support/ACE\ Vision/data/matchs/
 ```
 
 ## Développement
@@ -69,7 +69,7 @@ Chaque match est copié dans `~/Library/Application Support/ACE Vision/data/matc
 Comparer la détection aux coups notés par le joueur sur un match déjà analysé (réutilise `pose.npz`, pas de YOLO) :
 
 ```
-uv run python scripts/calibrate.py <id du match>
+ACE_DATA_DIR=~/Library/Application\ Support/ACE\ Vision/data uv run python scripts/calibrate.py <id du match>
 ```
 
 Le script affiche, note par note, le coup détecté le plus proche (écart, type), les coups manqués, les fausses frappes et le score. Deux notes à moins de 0,3 s d'écart sont comptées comme un seul coup (touche pressée deux fois).
