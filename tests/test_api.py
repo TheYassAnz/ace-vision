@@ -230,6 +230,13 @@ def test_server_prints_port_and_exits_when_stdin_closes(tmp_path):
     p.stdout.close()
 
 
+def test_output_after_ready_goes_to_stderr():
+    r = subprocess.run([sys.executable, "-c", "from ace.__main__ import announce; announce(1); print('plus tard')"],
+                       capture_output=True, text=True, check=True)
+    assert r.stdout == "ACE_READY 1\n"
+    assert "plus tard" in r.stderr
+
+
 def test_server_without_token_exits_2(tmp_path):
     env = {k: v for k, v in os.environ.items() if k != "ACE_TOKEN"}
     assert subprocess.run([sys.executable, "-m", "ace"], env={**env, "ACE_DATA_DIR": str(tmp_path)}, stdin=subprocess.DEVNULL).returncode == 2
