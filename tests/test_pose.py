@@ -39,6 +39,41 @@ def test_select_player_prefers_persistent_track():
     assert np.isnan(out[900:]).all()
 
 
+def _at(x):
+    k = _kpts()
+    k[:, 0] = x
+    return k
+
+
+def test_select_player_stitches_tracks_split_by_the_tracker():
+    # IMG_7687: the tracker lost the player twice and gave him 3 ids at the same place and size
+    tracks = {1: [(f, 100.0, _at(5)) for f in range(0, 50)],
+              2: [(f, 100.0, _at(6)) for f in range(60, 200)],
+              3: [(f, 110.0, _at(7)) for f in range(205, 300)]}
+    out = select_player(tracks, 300)
+    seen = ~np.isnan(out[:, 0, 0])
+    assert seen[:50].all() and seen[60:200].all() and seen[205:].all() and not seen[50:60].any()
+
+
+def test_stitching_skips_unreliable_frames_at_the_cut():
+    # IMG_7687: the tracker loses the player as he leaves the image, his last points are below confidence
+    lost = _at(5)
+    lost[:, 2] = 0.1
+    tracks = {1: [(f, 100.0, _at(5)) for f in range(60, 300)],
+              2: [(f, 100.0, _at(5)) for f in range(0, 48)] + [(f, 100.0, lost) for f in range(48, 50)]}
+    out = select_player(tracks, 300)
+    assert not np.isnan(out[:48, 0, 0]).any()
+
+
+def test_select_player_does_not_stitch_someone_else():
+    tracks = {1: [(f, 100.0, _at(5)) for f in range(0, 200)],
+              2: [(f, 100.0, _at(500)) for f in range(210, 260)],  # same size, far away
+              3: [(f, 10.0, _at(5)) for f in range(260, 300)],     # same place, much smaller (opponent)
+              4: [(f, 100.0, _at(6)) for f in range(150, 180)]}    # same time as the player
+    out = select_player(tracks, 300)
+    assert not np.isnan(out[:200, 0, 0]).any() and np.isnan(out[200:, 0, 0]).all()
+
+
 def test_select_player_nan_when_absent():
     tracks = {1: [(f, 100.0, _kpts()) for f in range(30) if not 10 <= f <= 20]}
     out = select_player(tracks, 30)
