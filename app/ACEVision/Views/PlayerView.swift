@@ -18,10 +18,15 @@ struct PlayerView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             VideoPlayer(player: model.player) {
-                if showSkeleton, let pose, let info = match.info {
-                    SkeletonOverlay(pose: pose, videoSize: CGSize(width: info.width, height: info.height), fps: info.fps, player: model.player)
+                ZStack {  // the overlay must fill the player: VideoPlayer sizes itself from it, an empty overlay shrinks the video
+                    Color.clear
+                    if showSkeleton, let pose, let info = match.info {
+                        SkeletonOverlay(pose: pose, videoSize: CGSize(width: info.width, height: info.height), fps: info.fps, player: model.player)
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .frame(maxWidth: .infinity)
             .frame(height: 260)
             if match.strokes.isEmpty {
                 Text("Aucun coup détecté sur ce match.").foregroundStyle(.secondary)
