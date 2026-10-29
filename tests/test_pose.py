@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from ace.geometry import MIN_CONF, angle_deg
-from ace.pose import extract_pose, select_player
+from ace.pose import extract_pose, model_path, select_player
 from ace.video import probe
 
 REAL = Path("videos/IMG_2665.mov")
@@ -15,6 +15,13 @@ def _kpts(conf=0.9):
     k = np.full((17, 3), 5.0)
     k[:, 2] = conf
     return k
+
+
+def test_model_path_from_env(monkeypatch):
+    monkeypatch.setenv("ACE_MODEL_PATH", "/x/m.pt")
+    assert model_path() == "/x/m.pt"
+    monkeypatch.delenv("ACE_MODEL_PATH")
+    assert model_path().endswith("models/yolo11m-pose.pt")
 
 
 def test_ultralytics_runs_offline():

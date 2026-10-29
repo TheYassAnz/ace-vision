@@ -12,7 +12,10 @@ from ace.domain import VideoInfo
 from ace.geometry import MIN_CONF
 from ace.video import iter_frames
 
-MODEL = str(Path(__file__).resolve().parent.parent / "models" / "yolo11m-pose.pt")  # independent of cwd
+
+def model_path() -> str:
+    """ACE_MODEL_PATH from the macOS app; else the repo model, resolved from __file__ so it is cwd-independent."""
+    return os.environ.get("ACE_MODEL_PATH") or str(Path(__file__).resolve().parent.parent / "models" / "yolo11m-pose.pt")
 
 
 def select_player(tracks: dict[int, list[tuple[int, float, np.ndarray]]], n_frames: int) -> np.ndarray:
@@ -30,7 +33,7 @@ def select_player(tracks: dict[int, list[tuple[int, float, np.ndarray]]], n_fram
 
 
 def extract_pose(path: Path, info: VideoInfo, on_progress: Callable[[float], None]) -> np.ndarray:
-    model = YOLO(MODEL)
+    model = YOLO(model_path())
     tracks: dict[int, list[tuple[int, float, np.ndarray]]] = {}
     for i, frame in iter_frames(path):
         if i >= info.n_frames:
