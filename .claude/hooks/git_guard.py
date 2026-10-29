@@ -61,14 +61,18 @@ def check(command, cwd):
         if sub == "push":
             refspecs = [a for a in rest if not a.startswith("-")][1:]
             if any(targets_main(r) for r in refspecs) or (not refspecs and branch == "main") \
+                    or "--all" in rest or "--mirror" in rest \
                     or ("HEAD" in refspecs and branch == "main"):
                 return "Push interdit sur main. Pousse ta branche et ouvre une PR."
     return None
 
 
 def main():
-    data = json.load(sys.stdin)
-    reason = check(data.get("tool_input", {}).get("command", ""), data.get("cwd"))
+    try:
+        data = json.load(sys.stdin)
+        reason = check(data.get("tool_input", {}).get("command", ""), data.get("cwd"))
+    except Exception as e:  # fail closed: a guard that crashes must not let the command through
+        reason = f"git_guard a échoué ({e}) ; commande bloquée par prudence."
     if reason:
         print(reason, file=sys.stderr)
         sys.exit(2)

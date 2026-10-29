@@ -37,6 +37,8 @@ def blocked(command, cwd):
     "git switch -c Feature/Thing",
     "git branch my-branch",
     "git switch fix/existing && git push origin main",
+    "git switch fix/existing && git push --all",
+    "git push --mirror origin",
 ])
 def test_blocks(repo, command):
     assert blocked(command, repo)

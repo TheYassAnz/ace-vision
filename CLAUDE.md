@@ -19,6 +19,7 @@ Pas de branche `develop` ni `release/` ; une release est un tag `v*` (voir `.git
 
 Si tu es sur `main` au moment de modifier du code, crée d'abord la branche avec le bon préfixe.
 Le hook `.claude/hooks/git_guard.py` bloque ces cas ; ne le contourne pas.
+Côté GitHub, le ruleset `protect-main` impose la PR et interdit force-push et suppression, sans bypass.
 
 ### Commits
 
