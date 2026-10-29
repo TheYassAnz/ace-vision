@@ -9,6 +9,7 @@ settings:
     ARCHS: arm64
     ONLY_ACTIVE_ARCH: YES
     MACOSX_DEPLOYMENT_TARGET: "15.0"
+    MARKETING_VERSION: "0.1.0"
 targets:
   ACEVision:
     type: application

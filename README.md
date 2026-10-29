@@ -2,14 +2,41 @@
 
 Application locale pour Mac qui analyse des vidéos de tennis filmées à l'iPhone. Elle repère chaque coup (coup droit, revers, service), calcule un bilan du match et signale les défauts de technique les plus fréquents avec des conseils. Tout tourne sur votre Mac : rien n'est envoyé sur Internet.
 
-ACE Vision devient une app macOS native (SwiftUI) ; le moteur Python tourne en sous-processus et expose une API JSON locale. Le mode d'emploi viendra avec l'app.
-
 ## Installation
 
+1. Téléchargez `ACE-Vision-<version>.zip` depuis la dernière [release](../../releases), décompressez-le et glissez **ACE Vision** dans Applications.
+2. L'app n'est pas signée par Apple : la première fois, faites un clic droit sur l'app puis **Ouvrir**, ou dans le Terminal :
+
 ```
-brew install uv
+xattr -dr com.apple.quarantine "ACE Vision.app"
+```
+
+3. Installez ffmpeg (fournit `ffprobe`) :
+
+```
+brew install ffmpeg
+```
+
+Au premier lancement, l'app installe le moteur d'analyse et télécharge le modèle de détection (environ 1 Go, connexion Internet nécessaire). Ensuite, tout tourne hors ligne.
+
+Pour reprendre des matchs analysés avec l'ancienne version en ligne de commande :
+
+```
+mv data/matchs ~/Library/Application\ Support/ACE\ Vision/data/
+```
+
+## Développement
+
+```
+brew install uv xcodegen
 uv sync
+xcodegen generate --spec app/project.yml
+open app/ACEVision.xcodeproj
 ```
+
+Le schéma `ACEVision` utilise le moteur du dépôt (variable `ACE_REPO`). Pour fabriquer la release : `bash scripts/build_app.sh <version>` (produit `dist/ACE-Vision-<version>.zip`).
+
+Licence : [AGPL-3.0](LICENSE) (imposée par Ultralytics).
 
 ## Filmer
 
@@ -35,7 +62,7 @@ ffmpeg -f concat -safe 0 -i liste.txt -c copy match.mov
 
 ## Données
 
-Chaque match est copié dans `data/matchs/<id>/`. Ce dossier n'est pas versionné. L'application n'a pas de bouton de suppression, mais importer à nouveau la même vidéo (même nom) remplace la copie et l'analyse précédentes ; si la vidéo a changé, les coups notés sont aussi effacés.
+Chaque match est copié dans `~/Library/Application Support/ACE Vision/data/matchs/<id>/`. L'app permet de supprimer un match ; importer à nouveau la même vidéo (même nom) remplace la copie et l'analyse précédentes ; si la vidéo a changé, les coups notés sont aussi effacés.
 
 ## Calibration
 
