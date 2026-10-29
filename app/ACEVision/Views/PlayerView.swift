@@ -17,14 +17,10 @@ struct PlayerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            VideoPlayer(player: model.player)
+            PlayerSurface(player: model.player, pose: showSkeleton ? pose : nil,
+                          videoSize: CGSize(width: match.info?.width ?? 0, height: match.info?.height ?? 0), fps: match.info?.fps ?? 0)
                 .frame(maxWidth: .infinity)
                 .frame(height: 260)
-                .overlay {  // not videoOverlay: its hosted content is not redrawn when showSkeleton or pose change
-                    if showSkeleton, let pose, let info = match.info {
-                        SkeletonOverlay(pose: pose, videoSize: CGSize(width: info.width, height: info.height), fps: info.fps, player: model.player)
-                    }
-                }
             if match.strokes.isEmpty {
                 Text("Aucun coup détecté sur ce match.").foregroundStyle(.secondary)
             } else {
