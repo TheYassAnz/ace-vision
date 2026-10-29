@@ -32,6 +32,7 @@ MIN_VALID_SHARE = 0.5  # of backswing frames with wrist and hips seen
 OVERHEAD_BEFORE_S, OVERHEAD_AFTER_S = 0.15, 0.1  # around impact, racket wrist above the head
 TOSS_WINDOW_S = 1.5  # free wrist above the head before a serve; a high follow-through has no toss
 # serve rule validated only on synthetic serves and one real backhand follow-through (IMG_2665, no serve);
+CLEAR_SIDE_MIN = 0.3  # torso lengths; IMG_2665 backswings sit 0.33-0.84 from the hips (high-finish BH 16.53: 0.70)
 # in rear view (no nose) the head falls back to the shoulders, a weaker test for the toss
 
 
@@ -60,19 +61,20 @@ def classify_stroke(kp: np.ndarray, frame: int, fps: float, settings: Settings, 
     other = L_WR if wr == R_WR else R_WR
     if not np.isfinite(right_dir) or right_dir == 0:
         return "other"
-    if _above_head(kp, wr, frame - round(OVERHEAD_BEFORE_S * fps), frame + round(OVERHEAD_AFTER_S * fps)):
-        if not _above_head(kp, other, frame - round(TOSS_WINDOW_S * fps), frame):
-            return "other"  # overhead without toss: the wrist near the midline makes the side test arbitrary
-        return "serve" if prev_hit is None or (frame - prev_hit) / fps >= SERVE_MIN_GAP_S else "other"
     # no separate two-hand rule: on IMG_2665 forehand backswings also keep the hands together (free hand
     # on the racket throat), and a two-handed backhand's backswing is on the backhand side anyway
     w = kp[max(0, frame - round(BACKSWING_START_S * fps)) : frame - round(BACKSWING_END_S * fps) + 1]
     s = (w[:, wr, 0] - w[:, [L_HIP, R_HIP], 0].mean(axis=1)) * right_dir  # > 0: player's right side
     s = s[np.isfinite(s)]
-    if len(w) == 0 or len(s) < MIN_VALID_SHARE * len(w):
+    side = float(np.median(s)) if len(w) and len(s) >= MIN_VALID_SHARE * len(w) else float("nan")
+    if _above_head(kp, wr, frame - round(OVERHEAD_BEFORE_S * fps), frame + round(OVERHEAD_AFTER_S * fps)):
+        if _above_head(kp, other, frame - round(TOSS_WINDOW_S * fps), frame):
+            return "serve" if prev_hit is None or (frame - prev_hit) / fps >= SERVE_MIN_GAP_S else "other"
+        if not abs(side) >= CLEAR_SIDE_MIN * torso_length(kp):  # NaN-safe
+            return "other"  # overhead, no toss, backswing near the midline: FH/BH would be arbitrary
+    if np.isnan(side):
         return "other"
-    return "forehand" if (np.median(s) > 0) == (settings.handedness == "right") else "backhand"
-
+    return "forehand" if (side > 0) == (settings.handedness == "right") else "backhand"
 
 def detect_strokes(kp: np.ndarray, fps: float, settings: Settings) -> list[Stroke]:
     strokes, prev = [], None
