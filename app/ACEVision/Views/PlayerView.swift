@@ -86,12 +86,16 @@ struct PlayerView: View {
 /// Gives the view its NSWindow, so key events from other windows and sheets are left alone.
 private struct WindowReader: NSViewRepresentable {
     @Binding var window: NSWindow?
-    func makeNSView(context: Context) -> NSView {
-        let v = NSView()
-        DispatchQueue.main.async { window = v.window }
+    final class Probe: NSView {
+        var onWindow: (NSWindow?) -> Void = { _ in }
+        override func viewDidMoveToWindow() { onWindow(window) }
+    }
+    func makeNSView(context: Context) -> Probe {
+        let v = Probe()
+        v.onWindow = { w in DispatchQueue.main.async { window = w } }
         return v
     }
-    func updateNSView(_ v: NSView, context: Context) {
-        DispatchQueue.main.async { if window !== v.window { window = v.window } }
+    func updateNSView(_ v: Probe, context: Context) {
+        v.onWindow = { w in DispatchQueue.main.async { window = w } }
     }
 }
