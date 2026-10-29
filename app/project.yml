@@ -1,0 +1,51 @@
+name: ACEVision
+options:
+  bundleIdPrefix: io.github.acevision
+  deploymentTarget:
+    macOS: "15.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    ARCHS: arm64
+    ONLY_ACTIVE_ARCH: YES
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+targets:
+  ACEVision:
+    type: application
+    platform: macOS
+    sources: [ACEVision]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.acevision.app
+        INFOPLIST_FILE: ACEVision/Info.plist
+        ENABLE_APP_SANDBOX: NO  # the app launches a process and reads paths the user picks
+        ENABLE_HARDENED_RUNTIME: NO
+        GENERATE_INFOPLIST_FILE: NO
+  ACEVisionTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - ACEVisionTests
+    dependencies:
+      - target: ACEVision
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.acevision.tests
+schemes:
+  ACEVision:
+    build:
+      targets:
+        ACEVision: all
+        ACEVisionTests: [test]
+    run:
+      environmentVariables:
+        - variable: ACE_REPO
+          value: $(SRCROOT)/..
+          isEnabled: true
+    test:
+      targets: [ACEVisionTests]
+      environmentVariables:
+        - variable: ACE_REPO
+          value: $(SRCROOT)/..
+          isEnabled: true
