@@ -218,7 +218,8 @@ def test_api_fixture_matches_swift_fixture():  # contract with app/ACEVisionTest
     m = make()
     m.status = "done"
     m.strokes = [Stroke(t=1.5, frame=45, kind="forehand", defects=["late_prep"], metrics={"stance_ratio": float("nan")}),
-                 Stroke(t=6.2, frame=186, kind="backhand", outcome="in", metrics={"stance_ratio": 1.1})]
+                 Stroke(t=6.2, frame=186, kind="backhand", outcome="in", metrics={"stance_ratio": 1.1},
+                        wrist_speed=8.5)]
     m.findings = [Finding(kind="forehand", defect="late_prep", count=1, total=1, title="Préparation tardive",
                           text="Prépare plus tôt.", drill="Raquette en arrière dès le rebond.", clip_times=[1.5])]
     m.score = Score(n_notes=2, n_detected=2, found_rate=1.0, class_rate=0.5, false_hits=0)

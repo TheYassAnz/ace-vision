@@ -13,6 +13,7 @@ private func fixture(_ name: String) throws -> Data {
     let m = try JSONDecoder.ace.decode(Match.self, from: fixture("match.json"))
     #expect(m.status == .done && m.strokes.count == 2 && m.findings.first?.clipTimes.isEmpty == false)
     #expect(m.strokes[0].defects == [.latePrep] && m.settings.backhandHands == 2)
+    #expect(m.strokes[0].wristSpeed == nil && m.strokes[1].wristSpeed == 8.5)
 }
 
 @Test func decodesSummaryDefectRates() throws {

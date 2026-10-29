@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from ace.domain import Settings
-from ace.strokes import body_right_dir, classify_stroke, detect_hits, detect_strokes
+from ace.strokes import HIT_MIN_SPEED, body_right_dir, classify_stroke, detect_hits, detect_strokes
 from ace.geometry import L_HIP, L_WR, NOSE, R_HIP, R_WR
 from tests.synthetic import NOSE_Y, SH_Y, add_swing, make_pose
 
@@ -18,6 +18,7 @@ def test_detects_two_swings():
     hits = detect_hits(kp, FPS, RIGHT)
     assert len(hits) == 2
     assert abs(hits[0] - 100) <= 2 and abs(hits[1] - 200) <= 2
+    assert all(s.wrist_speed >= HIT_MIN_SPEED for s in detect_strokes(kp, FPS, RIGHT))
 
 
 def test_ignores_slow_movements():
