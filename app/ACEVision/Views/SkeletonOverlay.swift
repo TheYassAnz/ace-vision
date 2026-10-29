@@ -13,6 +13,7 @@ struct PlayerSurface: NSViewRepresentable {
     func makeNSView(context: Context) -> AVPlayerView {
         let v = AVPlayerView()
         v.controlsStyle = .inline
+        v.showsFullScreenToggleButton = true
         v.player = player
         let s = SkeletonView(frame: v.contentOverlayView?.bounds ?? .zero)
         s.autoresizingMask = [.width, .height]
