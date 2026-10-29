@@ -70,7 +70,7 @@ struct PlayerView: View {
     }
 
     private func loadPose() async {
-        guard showSkeleton else { return }
+        guard showSkeleton else { poseLoading = false; return }  // a hide cancels the load before it can reset the spinner
         poseError = nil
         guard pose == nil || loadedFor != match.id else { return }
         pose = nil
