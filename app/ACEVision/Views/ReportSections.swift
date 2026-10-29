@@ -47,6 +47,7 @@ struct BreakdownSection: View {
 
 struct AdviceSection: View {
     let report: Report
+    let onClip: (Double) -> Void
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Conseils").font(.title2.bold())
@@ -60,9 +61,8 @@ struct AdviceSection: View {
                     Text(f.text)
                     Text("À essayer : \(f.drill)").italic()
                     HStack {
-                        // Task 6 wires these to the player
                         ForEach(f.clipTimes, id: \.self) { t in
-                            Button("Extrait à \(clock(t))") {}.disabled(true)
+                            Button("Extrait à \(clock(t))") { onClip(t) }
                         }
                     }
                 }
@@ -76,16 +76,19 @@ struct AdviceSection: View {
 
 struct StrokesTable: View {
     let strokes: [Stroke]
+    let onClip: (Double) -> Void
+    @State private var selection: Int?
     @State private var expanded = false
 
     var body: some View {
         DisclosureGroup("Tous mes coups", isExpanded: $expanded) {
-            Table(strokes.enumerated().map { Row(id: $0.offset, stroke: $0.element) }) {
+            Table(strokes.enumerated().map { Row(id: $0.offset, stroke: $0.element) }, selection: $selection) {
                 TableColumn("Temps") { Text(clock($0.stroke.t)).monospacedDigit() }
                 TableColumn("Type") { Text($0.stroke.kind.label) }
                 TableColumn("Défauts") { Text($0.stroke.defects.map(\.label).joined(separator: ", ")) }
             }
             .frame(height: 320)
+            .onChange(of: selection) { if let i = selection, strokes.indices.contains(i) { onClip(strokes[i].t) } }  // selecting a row (click or arrows) plays it
         }
     }
 

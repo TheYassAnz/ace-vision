@@ -3,20 +3,25 @@ import SwiftUI
 struct MatchView: View {
     let api: APIClient
     let library: Library
+    let notes: NotesSession
+    let dataDir: URL?
     @State private var match: Match?
+    @State private var player: PlayerModel?
     @State private var loadError: String?
     @State private var relaunchMessage: String?
 
     var body: some View {
         Group {
-            if let id = library.selection, let summary = library.matches.first(where: { $0.id == id }) {
+            if library.selection == Library.progressionId {
+                ProgressionView(matches: library.matches)
+            } else if let id = library.selection, let summary = library.matches.first(where: { $0.id == id }) {
                 content(summary)
                     .task(id: "\(id)-\(summary.status)") { await load(id) }
             } else {
                 ContentUnavailableView("Choisis un match dans la liste.", systemImage: "sidebar.left")
             }
         }
-        .navigationTitle(library.selection.flatMap { id in library.matches.first { $0.id == id }?.title } ?? "ACE Vision")
+        .navigationTitle(library.selection == Library.progressionId ? "Progression" : library.selection.flatMap { id in library.matches.first { $0.id == id }?.title } ?? "ACE Vision")
     }
 
     @ViewBuilder private func content(_ s: MatchSummary) -> some View {
@@ -36,22 +41,28 @@ struct MatchView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .done:
             if let m = match, m.id == s.id {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        let r = Report(m)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(m.title.isEmpty ? m.id : m.title).font(.largeTitle.bold()).lineLimit(1).truncationMode(.middle)
-                            Text(m.view.label).foregroundStyle(.secondary)
-                            if let n = r.coverageNotice { Label(n, systemImage: "exclamationmark.triangle") }
-                            if let n = r.reliability { Text(n).monospacedDigit() }
-                        }
-                        OverviewSection(report: r)
-                        BreakdownSection(report: r)
-                        AdviceSection(report: r)
-                        StrokesTable(strokes: m.strokes)
+                VStack(spacing: 0) {
+                    if let player {
+                        PlayerView(match: m, model: player, notes: notes, api: api).padding([.horizontal, .top], 24).padding(.bottom, 12)
+                        Divider()
                     }
-                    .padding(24)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 24) {
+                            let r = Report(m)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(m.title.isEmpty ? m.id : m.title).font(.largeTitle.bold()).lineLimit(1).truncationMode(.middle).help(m.title)
+                                Text(m.view.label).foregroundStyle(.secondary)
+                                if let n = r.coverageNotice { Label(n, systemImage: "exclamationmark.triangle") }
+                                if let n = r.reliability { Text(n).monospacedDigit() }
+                            }
+                            OverviewSection(report: r)
+                            BreakdownSection(report: r)
+                            AdviceSection(report: r) { player?.playClip(at: $0) }
+                            StrokesTable(strokes: m.strokes) { player?.playClip(at: $0) }
+                        }
+                        .padding(24)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
             } else if let e = loadError {
                 Text(e).frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -63,7 +74,14 @@ struct MatchView: View {
 
     private func load(_ id: String) async {
         guard library.matches.first(where: { $0.id == id })?.status == .done else { return }
-        do { match = try await api.match(id); loadError = nil }
+        do {
+            let m = try await api.match(id)
+            if match?.id != id || player == nil, let dataDir {
+                player = PlayerModel(url: dataDir.appending(path: "matchs/\(id)/\(m.videoFile)"))
+            }
+            notes.open(id, saved: (try? await api.notes(id)) ?? [])
+            match = m; loadError = nil
+        }
         catch { loadError = error.localizedDescription }
     }
 

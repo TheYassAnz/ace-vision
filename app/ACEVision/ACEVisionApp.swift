@@ -27,7 +27,7 @@ struct RootView: View {
             switch engine.state {
             case .starting: Text("Démarrage du moteur…").padding(40)
             case .failed(let message): Text(message).textSelection(.enabled).padding(40)
-            case .ready(let api): LibraryView(api: api, inbox: inbox)
+            case .ready(let api): LibraryView(api: api, inbox: inbox, dataDir: engine.dataDir)
             }
         }
         .task {

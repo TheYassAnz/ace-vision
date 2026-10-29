@@ -6,6 +6,7 @@ final class Engine {
     enum State { case starting, ready(APIClient), failed(String) }
 
     var state = State.starting
+    private(set) var dataDir: URL?
     @ObservationIgnored private var process: Process?
     @ObservationIgnored private var stdin: Pipe?
 
@@ -16,6 +17,7 @@ final class Engine {
 
     func start(_ loc: EngineLocation) async {
         state = .starting
+        dataDir = loc.environment["ACE_DATA_DIR"].map { URL(filePath: $0) }
         let token = (0..<32).map { _ in String(format: "%02x", UInt8.random(in: .min ... .max)) }.joined()
         let out = Pipe(), inp = Pipe(), p = Process()
         FileManager.default.createFile(atPath: loc.logFile.path, contents: nil)

@@ -5,6 +5,9 @@ import UniformTypeIdentifiers
 struct LibraryView: View {
     let api: APIClient
     let inbox: Inbox
+    let dataDir: URL?
+    @State private var notes = NotesSession()
+    @State private var pendingSelection: String??
     @State private var library: Library
     @State private var importer: ImportCoordinator
     @State private var isTargeted = false
@@ -14,9 +17,10 @@ struct LibraryView: View {
     @State private var deleteError: String?
     @SceneStorage("selection") private var stored: String?
 
-    init(api: APIClient, inbox: Inbox) {
+    init(api: APIClient, inbox: Inbox, dataDir: URL?) {
         self.api = api
         self.inbox = inbox
+        self.dataDir = dataDir
         _library = State(initialValue: Library(api: api))
         _importer = State(initialValue: ImportCoordinator(api: api))
     }
@@ -33,9 +37,12 @@ struct LibraryView: View {
                     Button("Ajouter un match") { inbox.showFileImporter = true }
                 }
             } else {
-                List(library.matches, selection: $library.selection) { m in
-                    row(m).tag(m.id)
-                        .contextMenu { Button("Supprimer le match…", role: .destructive) { deleteTarget = m.id } }
+                List(selection: Binding(get: { library.selection }, set: { select($0) })) {
+                    ForEach(library.matches) { m in
+                        row(m).tag(m.id)
+                            .contextMenu { Button("Supprimer le match…", role: .destructive) { deleteTarget = m.id } }
+                    }
+                    Label("Progression", systemImage: "chart.line.uptrend.xyaxis").tag(Library.progressionId)
                 }
                 .safeAreaInset(edge: .bottom) {
                     if let e = library.error {
@@ -45,7 +52,7 @@ struct LibraryView: View {
                 }
             }
         } detail: {
-            MatchView(api: api, library: library)
+            MatchView(api: api, library: library, notes: notes, dataDir: dataDir)
         }
         .frame(minWidth: 800, minHeight: 500)
         .toolbar {
@@ -88,6 +95,11 @@ struct LibraryView: View {
         .alert("Analyse en attente", isPresented: $queuedAlert) {
             Button("OK") {}
         } message: { Text("Une analyse est déjà en cours. Celle-ci démarrera quand tu cliqueras sur Relancer l'analyse.") }
+        .confirmationDialog("Enregistrer tes notes ?", isPresented: Binding(get: { pendingSelection != nil }, set: { if !$0 { pendingSelection = nil } }), titleVisibility: .visible) {
+            Button("Enregistrer les notes") { Task { if await notes.save(api) { applyPending() } } }
+            Button("Ne pas enregistrer") { notes.discard(); applyPending() }
+            Button("Annuler", role: .cancel) {}
+        }
         .confirmationDialog("Supprimer ce match ?", isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), titleVisibility: .visible) {
             Button("Supprimer le match", role: .destructive) { if let id = deleteTarget { Task { await delete(id) } } }
             Button("Annuler", role: .cancel) {}
@@ -99,10 +111,10 @@ struct LibraryView: View {
             inbox.takeOpened().first.map { importer.offer($0) }
         }
         .onChange(of: inbox.notifiedMatch, initial: true) {
-            if let id = inbox.takeNotifiedMatch() { library.selection = id }
+            if let id = inbox.takeNotifiedMatch() { select(id) }
         }
         .onChange(of: inbox.deleteRequested) {
-            if inbox.deleteRequested { deleteTarget = library.selection; inbox.deleteRequested = false }
+            if inbox.deleteRequested { deleteTarget = library.selection == Library.progressionId ? nil : library.selection; inbox.deleteRequested = false }
         }
         .task {
             library.onFinished = { Notifier.post($0) }
@@ -110,6 +122,16 @@ struct LibraryView: View {
             await library.poll()
         }
         .onChange(of: library.selection) { stored = library.selection }
+    }
+
+    /// Leaving a match with unsaved notes asks first.
+    private func select(_ id: String?) {
+        if notes.hasUnsaved && id != library.selection { pendingSelection = .some(id) } else { library.selection = id }
+    }
+
+    private func applyPending() {
+        if let p = pendingSelection { library.selection = p }
+        pendingSelection = nil
     }
 
     private func delete(_ id: String) async {

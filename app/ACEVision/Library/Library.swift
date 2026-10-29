@@ -7,6 +7,8 @@ extension APIClient: MatchListing {}
 @MainActor @Observable
 final class Library {
     var matches: [MatchSummary] = []
+    /// Reserved selection id for the Progression row (match ids are "yyyy-MM-dd-slug").
+    static let progressionId = "__progression__"
     var selection: String?
     var error: String?
     var onFinished: ((MatchSummary) -> Void)?
