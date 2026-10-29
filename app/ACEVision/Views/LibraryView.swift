@@ -95,11 +95,11 @@ struct LibraryView: View {
         .alert("Suppression impossible", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
             Button("OK") {}
         } message: { Text(deleteError ?? "") }
-        .onChange(of: inbox.opened) {
-            inbox.opened.first.map { importer.offer($0) }
+        .onChange(of: inbox.opened, initial: true) {
+            inbox.takeOpened().first.map { importer.offer($0) }
         }
-        .onChange(of: inbox.notifiedMatch) {
-            if let id = inbox.notifiedMatch { library.selection = id; inbox.notifiedMatch = nil }
+        .onChange(of: inbox.notifiedMatch, initial: true) {
+            if let id = inbox.takeNotifiedMatch() { library.selection = id }
         }
         .onChange(of: inbox.deleteRequested) {
             if inbox.deleteRequested { deleteTarget = library.selection; inbox.deleteRequested = false }

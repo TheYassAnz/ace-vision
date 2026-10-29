@@ -53,3 +53,12 @@ private func tempMovie(_ ext: String = "mov") -> URL {
     #expect(await c.confirm(view: nil, title: "", deleteAfter: true) == nil)
     #expect(c.viewError == "Choisis d'où filmait l'iPhone." && spy.calls == 0 && FileManager.default.fileExists(atPath: tmp.path))
 }
+
+@MainActor @Test func inboxDeliversOpenedOnce() {
+    let inbox = Inbox()
+    let u = URL(filePath: "/tmp/a.mov")
+    inbox.opened = [u]
+    #expect(inbox.takeOpened() == [u] && inbox.takeOpened() == [])
+    inbox.opened = [u]
+    #expect(inbox.takeOpened() == [u])
+}

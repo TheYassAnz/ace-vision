@@ -10,6 +10,10 @@ final class Inbox {
     var showFileImporter = false
     var showPhotos = false
     var deleteRequested = false
+
+    /// Hands over pending Dock/"Open with" URLs once; a later identical open is delivered again.
+    func takeOpened() -> [URL] { defer { opened = [] }; return opened }
+    func takeNotifiedMatch() -> String? { defer { notifiedMatch = nil }; return notifiedMatch }
 }
 
 @MainActor
