@@ -9,10 +9,20 @@ struct PlayerView: View {
     @State private var leaving = false
     @State private var keyMonitor: Any?
     @State private var window: NSWindow?
+    @AppStorage("showSkeleton") private var showSkeleton = false
+    @State private var pose: Pose?
+    @State private var poseError: String?
+    @State private var poseLoading = false
+    @State private var loadedFor: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            VideoPlayer(player: model.player).frame(height: 260)
+            VideoPlayer(player: model.player) {
+                if showSkeleton, let pose, let info = match.info {
+                    SkeletonOverlay(pose: pose, videoSize: CGSize(width: info.width, height: info.height), fps: info.fps, player: model.player)
+                }
+            }
+            .frame(height: 260)
             if match.strokes.isEmpty {
                 Text("Aucun coup détecté sur ce match.").foregroundStyle(.secondary)
             } else {
@@ -20,6 +30,7 @@ struct PlayerView: View {
             }
             controls
         }
+        .task(id: "\(match.id)-\(showSkeleton)") { await loadPose() }
         .onChange(of: notes.active, initial: true) { _, on in on ? installKeys() : removeKeys() }
         .background(WindowReader(window: $window))
         .onAppear { if notes.active { installKeys() } }
@@ -47,10 +58,29 @@ struct PlayerView: View {
             if notes.saving { ProgressView().controlSize(.small); Text("Enregistrement…") }
             else if let m = notes.message { Text(m).foregroundStyle(.secondary).monospacedDigit() }
         }
+        HStack {
+            Button(showSkeleton ? "Masquer le squelette" : "Afficher le squelette") { showSkeleton.toggle() }
+            if poseLoading { ProgressView().controlSize(.small); Text("Chargement du squelette…") }
+            if let e = poseError { Text(e).foregroundStyle(.red) }
+        }
         if notes.active {
             Text("Appuie sur D (coup droit), R (revers), S (service) ou A (autre) à chaque coup. ⌫ annule la dernière note, espace lance ou met en pause la vidéo.")
                 .font(.callout).foregroundStyle(.secondary)
         }
+    }
+
+    private func loadPose() async {
+        guard showSkeleton else { return }
+        poseError = nil
+        guard pose == nil || loadedFor != match.id else { return }
+        pose = nil
+        poseLoading = true
+        defer { poseLoading = false }
+        do {
+            let p = try await api.pose(match.id)
+            pose = p
+            loadedFor = match.id
+        } catch { poseError = error.localizedDescription }
     }
 
     private func removeKeys() {

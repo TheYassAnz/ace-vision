@@ -240,3 +240,18 @@ def test_output_after_ready_goes_to_stderr():
 def test_server_without_token_exits_2(tmp_path):
     env = {k: v for k, v in os.environ.items() if k != "ACE_TOKEN"}
     assert subprocess.run([sys.executable, "-m", "ace"], env={**env, "ACE_DATA_DIR": str(tmp_path)}, stdin=subprocess.DEVNULL).returncode == 2
+
+
+def test_pose_is_float32_frames():
+    import numpy as np
+    m = make(); kp = np.full((3, 17, 3), 1.5); kp[1, 0, :2] = np.nan
+    np.savez_compressed(store.pose_path(m.id), kp=kp)
+    r = client.get(f"/matchs/{m.id}/pose")
+    a = np.frombuffer(r.content, dtype="<f4").reshape(3, 17, 2)
+    assert r.headers["content-type"] == "application/octet-stream" and a[0, 0, 0] == 1.5 and np.isnan(a[1, 0, 0])
+
+
+def test_pose_missing_is_404():
+    m = make()
+    r = client.get(f"/matchs/{m.id}/pose")
+    assert r.status_code == 404 and r.json()["detail"] == "Squelette indisponible : relance l'analyse."

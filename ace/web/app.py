@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Annotated, Literal
 
+import numpy as np
 from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from fastapi.exceptions import RequestValidationError
@@ -109,6 +110,17 @@ def delete(id: str):
     except store.UserError as e:
         return JSONResponse({"detail": str(e)}, status_code=409)
     return Response(status_code=204)
+
+
+@app.get("/matchs/{id}/pose")
+def pose(id: str):
+    get_match(id)
+    path = store.pose_path(id)
+    if not path.exists():
+        raise HTTPException(404, "Squelette indisponible : relance l'analyse.")
+    with np.load(path) as z:
+        body = z["kp"][:, :, :2].astype("<f4").tobytes()
+    return Response(content=body, media_type="application/octet-stream")
 
 
 @app.get("/matchs/{id}/notes")

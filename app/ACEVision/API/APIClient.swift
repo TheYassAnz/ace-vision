@@ -65,6 +65,8 @@ final class APIClient: Sendable {
         try decode(await send("POST", "/matchs/\(id)/notes", body: notes))
     }
 
+    func pose(_ id: String) async throws -> Pose { Pose(data: try await send("GET", "/matchs/\(id)/pose", timeout: 60)) }
+
     func settings() async throws -> Settings { try await get("/reglages") }
     func saveSettings(_ s: Settings) async throws -> Settings { try decode(await send("PUT", "/reglages", body: s)) }
 }
