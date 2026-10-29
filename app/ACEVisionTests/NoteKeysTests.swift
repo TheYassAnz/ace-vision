@@ -18,3 +18,8 @@ import Testing
 @Test func ignoresKeysWhileEditingText() {
     #expect(NoteKeys.action(characters: "d", keyCode: 2, modifiers: [], editingText: true) == nil)
 }
+@Test func ignoresRepeatsAndBlockedKeys() {
+    #expect(NoteKeys.action(characters: "d", keyCode: 2, modifiers: [], editingText: false, isRepeat: true) == nil)
+    #expect(NoteKeys.action(characters: "\u{7f}", keyCode: 51, modifiers: [], editingText: false, isRepeat: true) == nil)
+    #expect(NoteKeys.action(characters: " ", keyCode: 49, modifiers: [], editingText: false, blocked: true) == nil)
+}

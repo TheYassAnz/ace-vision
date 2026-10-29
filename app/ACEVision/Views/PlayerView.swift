@@ -8,6 +8,7 @@ struct PlayerView: View {
     let api: APIClient
     @State private var leaving = false
     @State private var keyMonitor: Any?
+    @State private var window: NSWindow?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -20,6 +21,8 @@ struct PlayerView: View {
             controls
         }
         .onChange(of: notes.active, initial: true) { _, on in on ? installKeys() : removeKeys() }
+        .background(WindowReader(window: $window))
+        .onAppear { if notes.active { installKeys() } }
         .onDisappear { removeKeys() }
         .confirmationDialog("Enregistrer tes notes ?", isPresented: $leaving, titleVisibility: .visible) {
             Button("Enregistrer les notes") { Task { if await notes.save(api) { notes.active = false } } }
@@ -57,13 +60,18 @@ struct PlayerView: View {
 
     private func installKeys() {
         removeKeys()
-        let notes = notes, model = model
+        let notes = notes, model = model, window = $window, leaving = $leaving
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            let chars = event.characters, code = event.keyCode, mods = event.modifierFlags
+            let chars = event.characters, code = event.keyCode, mods = event.modifierFlags, rep = event.isARepeat
+            let eventWindow = event.window
             let handled = MainActor.assumeIsolated {
                 let editing = NSApp.keyWindow?.firstResponder is NSText
-                switch NoteKeys.action(characters: chars, keyCode: code, modifiers: mods, editingText: editing) {
-                case .stroke(let c): _ = notes.recorder.handle(key: c, at: model.player.currentTime().seconds)
+                let w = window.wrappedValue
+                let blocked = w == nil || eventWindow !== w || w?.attachedSheet != nil || leaving.wrappedValue || notes.saving
+                switch NoteKeys.action(characters: chars, keyCode: code, modifiers: mods, editingText: editing, isRepeat: rep, blocked: blocked) {
+                case .stroke(let c):
+                    let t = model.player.currentTime().seconds
+                    if t.isFinite { _ = notes.recorder.handle(key: c, at: t) }
                 case .undo: notes.recorder.undo()
                 case .playPause: model.togglePlay()
                 case nil: return false
@@ -72,5 +80,18 @@ struct PlayerView: View {
             }
             return handled ? nil : event
         }
+    }
+}
+
+/// Gives the view its NSWindow, so key events from other windows and sheets are left alone.
+private struct WindowReader: NSViewRepresentable {
+    @Binding var window: NSWindow?
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        DispatchQueue.main.async { window = v.window }
+        return v
+    }
+    func updateNSView(_ v: NSView, context: Context) {
+        DispatchQueue.main.async { if window !== v.window { window = v.window } }
     }
 }
