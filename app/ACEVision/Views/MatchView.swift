@@ -79,7 +79,7 @@ struct MatchView: View {
             if match?.id != id || player == nil, let dataDir {
                 player = PlayerModel(url: dataDir.appending(path: "matchs/\(id)/\(m.videoFile)"))
             }
-            notes.open(id, saved: (try? await api.notes(id)) ?? [])
+            do { notes.open(id, saved: try await api.notes(id)) } catch { notes.fail(error.localizedDescription) }
             match = m; loadError = nil
         }
         catch { loadError = error.localizedDescription }

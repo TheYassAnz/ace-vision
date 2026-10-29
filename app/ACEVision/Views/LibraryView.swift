@@ -83,7 +83,7 @@ struct LibraryView: View {
                 Notifier.requestAuthorization()
                 Task {
                     await library.refresh()
-                    library.selection = r.match.id
+                    select(r.match.id)
                     queuedAlert = r.queued
                     AccessibilityNotification.Announcement("Import terminé").post()
                 }
@@ -96,8 +96,8 @@ struct LibraryView: View {
             Button("OK") {}
         } message: { Text("Une analyse est déjà en cours. Celle-ci démarrera quand tu cliqueras sur Relancer l'analyse.") }
         .confirmationDialog("Enregistrer tes notes ?", isPresented: Binding(get: { pendingSelection != nil }, set: { if !$0 { pendingSelection = nil } }), titleVisibility: .visible) {
-            Button("Enregistrer les notes") { Task { if await notes.save(api) { applyPending() } } }
-            Button("Ne pas enregistrer") { notes.discard(); applyPending() }
+            Button("Enregistrer les notes") { let p = pendingSelection; Task { if await notes.save(api) { applyPending(p) } } }
+            Button("Ne pas enregistrer") { let p = pendingSelection; notes.discard(); applyPending(p) }
             Button("Annuler", role: .cancel) {}
         }
         .confirmationDialog("Supprimer ce match ?", isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), titleVisibility: .visible) {
@@ -129,8 +129,8 @@ struct LibraryView: View {
         if notes.hasUnsaved && id != library.selection { pendingSelection = .some(id) } else { library.selection = id }
     }
 
-    private func applyPending() {
-        if let p = pendingSelection { library.selection = p }
+    private func applyPending(_ p: String??) {
+        if let p { library.selection = p }
         pendingSelection = nil
     }
 

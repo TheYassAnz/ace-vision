@@ -18,5 +18,6 @@ private func summary(_ id: String, _ status: MatchStatus, created: String?) -> M
 
 @Test func progressionFallsBackToIdDate() {
     let p = Progression.points([summary("2026-01-15-x", .done, created: nil)])
-    #expect(p.count == 1)
+    let expected = Calendar.current.date(from: DateComponents(year: 2026, month: 1, day: 15))
+    #expect(p.map(\.date) == [expected])
 }

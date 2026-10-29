@@ -40,6 +40,7 @@ final class NotesSession {
     var active = false
     var saving = false
     var message: String?
+    private(set) var loadError: String?
     private(set) var matchId: String?
     private(set) var saved: [Note] = []
 
@@ -49,8 +50,15 @@ final class NotesSession {
 
     func open(_ id: String, saved notes: [Note]) {
         guard id != matchId else { return }
-        matchId = id; saved = notes; active = false; message = nil
+        matchId = id; saved = notes; active = false; message = nil; loadError = nil
         recorder = NoteRecorder(notes: notes)
+    }
+
+    /// The saved notes could not be read: refuse note mode, or saving would overwrite them.
+    func fail(_ reason: String) {
+        matchId = nil; saved = []; active = false; message = nil
+        recorder = NoteRecorder(notes: [])
+        loadError = "Impossible de charger tes notes (\(reason)) Rouvre le match pour réessayer."
     }
 
     func start() { recorder = NoteRecorder(notes: saved); message = nil; active = true }

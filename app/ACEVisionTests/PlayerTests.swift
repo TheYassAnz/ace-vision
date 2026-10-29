@@ -33,3 +33,9 @@ import Testing
     #expect(Timeline.neighbor(of: 20, in: s, forward: false)?.t == 10)
     #expect(Timeline.neighbor(of: 30, in: s, forward: true) == nil)
 }
+
+@Test func staleClipGenerationIsDropped() {
+    var g = ClipGeneration()
+    let first = g.next(), second = g.next()
+    #expect(!g.isCurrent(first) && g.isCurrent(second))
+}

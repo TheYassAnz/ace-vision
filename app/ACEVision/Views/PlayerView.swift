@@ -33,10 +33,12 @@ struct PlayerView: View {
                 else if notes.hasUnsaved { leaving = true }
                 else { notes.discard() }
             }
+            .disabled(notes.loadError != nil)
             if notes.active {
                 Button("Enregistrer les notes") { Task { await notes.save(api) } }.disabled(notes.saving || !notes.recorder.hasUnsaved)
                 Text(notes.recorder.countLabel).monospacedDigit()
             }
+            if let e = notes.loadError { Text(e).foregroundStyle(.red) }
             if notes.saving { ProgressView().controlSize(.small); Text("Enregistrement…") }
             else if let m = notes.message { Text(m).foregroundStyle(.secondary).monospacedDigit() }
         }
@@ -45,10 +47,10 @@ struct PlayerView: View {
                 .font(.callout).foregroundStyle(.secondary)
                 .focusable().focused($keysFocused)
                 .onKeyPress(phases: .down) { press in
-                    guard press.modifiers.isEmpty else { return .ignored }
-                    if press.key == .delete { notes.recorder.undo(); return .handled }
-                    if press.key == .space { model.togglePlay(); return .handled }
-                    if let c = press.characters.first, notes.recorder.handle(key: c, at: model.currentTime) { return .handled }
+                    if press.key == .delete && press.modifiers.isEmpty { notes.recorder.undo(); return .handled }
+                    if press.key == .space && press.modifiers.isEmpty { model.togglePlay(); return .handled }
+                    // Shift and Caps Lock only change the case of the letter
+                    if press.modifiers.isDisjoint(with: [.command, .control, .option]), let c = press.characters.first, notes.recorder.handle(key: c, at: model.currentTime) { return .handled }
                     return .ignored
                 }
         }
