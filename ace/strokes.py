@@ -2,7 +2,7 @@ import numpy as np
 from scipy.signal import find_peaks
 
 from ace.domain import Settings, Stroke, StrokeKind
-from ace.geometry import L_HIP, L_SH, L_WR, NOSE, R_HIP, R_SH, R_WR, torso_length
+from ace.geometry import L_HIP, L_SH, L_WR, R_HIP, R_SH, R_WR, torso_length
 
 HIT_MIN_SPEED = 6.0  # torso lengths / s; IMG_2665 scores the same from 5 to 8 (calibrated Task 12)
 MIN_HIT_GAP_S = 1.2  # a backswing can peak ~0.85 s before its impact (IMG_2665); find_peaks keeps the stronger
@@ -33,7 +33,7 @@ OVERHEAD_BEFORE_S, OVERHEAD_AFTER_S = 0.15, 0.1  # around impact, racket wrist a
 TOSS_WINDOW_S = 1.5  # free wrist above the head before a serve; a high follow-through has no toss
 # serve rule validated only on synthetic serves and one real backhand follow-through (IMG_2665, no serve);
 CLEAR_SIDE_MIN = 0.3  # torso lengths; IMG_2665 backswings sit 0.33-0.84 from the hips (high-finish BH 16.53: 0.70)
-# in rear view (no nose) the head falls back to the shoulders, a weaker test for the toss
+HEAD_TOP_ABOVE_SHOULDERS = 0.8  # torso lengths; IMG_7687 rear view: forehands rise to 0.55, free wrist to 0.28; synthetic serve 1.5
 
 
 def body_right_dir(kp: np.ndarray) -> float:
@@ -43,16 +43,16 @@ def body_right_dir(kp: np.ndarray) -> float:
     return float(np.sign(np.nanmedian(d))) if np.isfinite(d).any() else float("nan")
 
 
-def _head_y(kp: np.ndarray) -> np.ndarray:
-    """Per-frame head height; face hidden (player seen from behind): fall back on the shoulders."""
+def _head_top_y(kp: np.ndarray) -> np.ndarray:
+    """Per-frame top of the head, from the shoulders only: the face is hidden ~93% of the time in rear view."""
     l, r = kp[:, L_SH, 1], kp[:, R_SH, 1]
     shoulders = (np.fmin(l, r) + np.fmax(l, r)) / 2  # nanmean without the all-NaN warning
-    return np.where(np.isnan(kp[:, NOSE, 1]), shoulders, kp[:, NOSE, 1])
+    return shoulders - HEAD_TOP_ABOVE_SHOULDERS * torso_length(kp)
 
 
 def _above_head(kp: np.ndarray, wrist: int, a: int, b: int) -> bool:
     w = kp[max(0, a) : b + 1]
-    return bool(np.any(w[:, wrist, 1] < _head_y(w)))  # image y grows downward: smaller = higher; NaN is False
+    return bool(np.any(w[:, wrist, 1] < _head_top_y(w)))  # image y grows downward: smaller = higher; NaN is False
 
 
 def classify_stroke(kp: np.ndarray, frame: int, fps: float, settings: Settings, prev_hit: int | None,

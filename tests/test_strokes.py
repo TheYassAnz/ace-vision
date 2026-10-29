@@ -4,7 +4,7 @@ import pytest
 from ace.domain import Settings
 from ace.strokes import body_right_dir, classify_stroke, detect_hits, detect_strokes
 from ace.geometry import L_HIP, L_WR, NOSE, R_HIP, R_WR
-from tests.synthetic import NOSE_Y, add_swing, make_pose
+from tests.synthetic import NOSE_Y, SH_Y, add_swing, make_pose
 
 FPS = 30.0
 RIGHT = Settings(handedness="right", backhand_hands=2)
@@ -118,10 +118,26 @@ def test_first_overhead_is_serve():
     assert _classify(_swing("camera", "overhead")) == "serve"
 
 
-def test_overhead_without_nose_uses_shoulders():
+def test_overhead_seen_from_behind_is_serve():
     kp = _swing("away", "overhead")
     kp[:, NOSE] = np.nan  # seen from behind: no face
     assert _classify(kp) == "serve"
+
+
+def test_rear_forehand_with_raised_arms_is_not_serve():
+    # IMG_7687, rear view: racket wrist up to 0.55 torso above the shoulders, free wrist 0.28, no face
+    kp = _swing("away", "right")
+    kp[:, NOSE] = np.nan
+    kp[95:104, R_WR, 1] = SH_Y - 55  # torso = 100 px in tests.synthetic
+    kp[60:100, L_WR, 1] = SH_Y - 28
+    assert _classify(kp) == "forehand"
+
+
+def test_wrist_just_above_nose_is_not_overhead():
+    kp = _swing("camera", "right")
+    kp[95:104, R_WR, 1] = NOSE_Y - 10
+    kp[60:100, L_WR, 1] = NOSE_Y - 10
+    assert _classify(kp) == "forehand"
 
 
 def test_high_follow_through_without_toss_is_not_serve():
