@@ -38,9 +38,8 @@ struct BreakdownSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Où ça casse").font(.title2.bold())
-            Text(report.rallies == nil
-                 ? "Disponible en vue arrière : filme depuis derrière toi, en paysage et en 60 i/s, pour voir où finissent tes balles."
-                 : "La carte du court et le détail des fautes arrivent bientôt.")
+            // the engine does not track the ball yet, so rallies are never computed (ace/pipeline.py)
+            Text("Pas encore disponible : l'app ne suit pas encore la balle, elle ne peut donc pas savoir où finissent tes points (filet, long, large).")
         }
     }
 }
