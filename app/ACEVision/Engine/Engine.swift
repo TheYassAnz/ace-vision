@@ -9,6 +9,7 @@ final class Engine {
     private(set) var dataDir: URL?
     @ObservationIgnored private var process: Process?
     @ObservationIgnored private var stdin: Pipe?
+    var isRunning: Bool { process != nil }
 
     nonisolated static func parseReady(_ line: String) -> Int? {
         let parts = line.split(separator: " ")

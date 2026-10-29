@@ -20,3 +20,18 @@ func engineStartsAndAnswers() async throws {
     guard case .ready(let client) = engine.state else { if case .failed(let m) = engine.state { Issue.record(Comment(rawValue: m)) }; return }
     #expect(try await client.matches().isEmpty)
 }
+
+@MainActor
+@Test func launcherRunsOnceUntilEngineStops() async {
+    let launcher = Launcher()
+    var up = false, runs = 0
+    let body = { runs += 1; try? await Task.sleep(for: .milliseconds(50)); up = true }
+    let first = Task { await launcher.run(unless: up, body) }
+    let second = Task { await launcher.run(unless: up, body) }  // overlaps the first (setup still running)
+    await first.value; await second.value
+    await launcher.run(unless: up, body)  // engine already up (window reopened)
+    #expect(runs == 1)
+    up = false
+    await launcher.run(unless: up, body)  // engine stopped after a failure: retry is allowed
+    #expect(runs == 2)
+}

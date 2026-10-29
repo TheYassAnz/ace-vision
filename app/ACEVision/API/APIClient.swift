@@ -18,10 +18,10 @@ final class APIClient: Sendable {
     private struct Detail: Decodable { let detail: String }
     private struct Queued: Decodable { let queued: Bool }
 
-    private func send(_ method: String, _ path: String, body: (any Encodable & Sendable)? = nil) async throws -> Data {
+    private func send(_ method: String, _ path: String, body: (any Encodable & Sendable)? = nil, timeout: TimeInterval = 30) async throws -> Data {
         var req = URLRequest(url: base.appending(path: path))
         req.httpMethod = method
-        req.timeoutInterval = 30
+        req.timeoutInterval = timeout
         req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         if let body {
             req.httpBody = try JSONEncoder.ace.encode(body)
@@ -50,7 +50,7 @@ final class APIClient: Sendable {
 
     func importVideo(path: URL, view: CourtView, title: String) async throws -> ImportResult {
         struct Body: Encodable, Sendable { let path: String; let view: CourtView; let title: String }
-        return try decode(await send("POST", "/matchs", body: Body(path: path.path, view: view, title: title)))
+        return try decode(await send("POST", "/matchs", body: Body(path: path.path, view: view, title: title), timeout: 3600))  // the engine copies the whole video first
     }
 
     func relaunch(_ id: String) async throws -> Bool {

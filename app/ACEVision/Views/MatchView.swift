@@ -16,11 +16,12 @@ struct MatchView: View {
                 ProgressionView(matches: library.matches)
             } else if let id = library.selection, let summary = library.matches.first(where: { $0.id == id }) {
                 content(summary)
-                    .task(id: "\(id)-\(summary.status)") { await load(id) }
+                    .task(id: "\(id)-\(summary.status)-\(notes.revision)") { await load(id) }
             } else {
                 ContentUnavailableView("Choisis un match dans la liste.", systemImage: "sidebar.left")
             }
         }
+        .onChange(of: notes.revision) { Task { await library.refresh() } }
         .navigationTitle(library.selection == Library.progressionId ? "Progression" : library.selection.flatMap { id in library.matches.first { $0.id == id }?.title } ?? "ACE Vision")
     }
 

@@ -35,7 +35,7 @@ struct PlayerView: View {
             }
             .disabled(notes.loadError != nil)
             if notes.active {
-                Button("Enregistrer les notes") { Task { await notes.save(api) } }.disabled(notes.saving || !notes.recorder.hasUnsaved)
+                Button("Enregistrer les notes") { Task { await notes.save(api) } }.disabled(notes.saving || !notes.recorder.hasUnsaved || notes.recorder.notes.isEmpty)
                 Text(notes.recorder.countLabel).monospacedDigit()
             }
             if let e = notes.loadError { Text(e).foregroundStyle(.red) }

@@ -6,9 +6,9 @@ struct LibraryView: View {
     let api: APIClient
     let inbox: Inbox
     let dataDir: URL?
-    @State private var notes = NotesSession()
+    let library: Library
+    let notes: NotesSession
     @State private var pendingSelection: String??
-    @State private var library: Library
     @State private var importer: ImportCoordinator
     @State private var isTargeted = false
     @State private var queuedAlert = false
@@ -17,11 +17,12 @@ struct LibraryView: View {
     @State private var deleteError: String?
     @SceneStorage("selection") private var stored: String?
 
-    init(api: APIClient, inbox: Inbox, dataDir: URL?) {
+    init(api: APIClient, library: Library, notes: NotesSession, inbox: Inbox, dataDir: URL?) {
         self.api = api
+        self.library = library
+        self.notes = notes
         self.inbox = inbox
         self.dataDir = dataDir
-        _library = State(initialValue: Library(api: api))
         _importer = State(initialValue: ImportCoordinator(api: api))
     }
 
@@ -90,10 +91,10 @@ struct LibraryView: View {
             }
         }
         .alert("Import impossible", isPresented: Binding(get: { importer.error != nil }, set: { if !$0 { importer.error = nil } })) {
-            Button("OK") { importer.error = nil }
+            Button("Fermer") { importer.error = nil }
         } message: { Text(importer.error ?? "") }
         .alert("Analyse en attente", isPresented: $queuedAlert) {
-            Button("OK") {}
+            Button("Fermer") {}
         } message: { Text("Une analyse est déjà en cours. Celle-ci démarrera quand tu cliqueras sur Relancer l'analyse.") }
         .confirmationDialog("Enregistrer tes notes ?", isPresented: Binding(get: { pendingSelection != nil }, set: { if !$0 { pendingSelection = nil } }), titleVisibility: .visible) {
             Button("Enregistrer les notes") { let p = pendingSelection; Task { if await notes.save(api) { applyPending(p) } } }
@@ -105,7 +106,7 @@ struct LibraryView: View {
             Button("Annuler", role: .cancel) {}
         } message: { Text("La copie de la vidéo et l'analyse seront effacées. La vidéo d'origine n'est pas touchée.") }
         .alert("Suppression impossible", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
-            Button("OK") {}
+            Button("Fermer") {}
         } message: { Text(deleteError ?? "") }
         .onChange(of: inbox.opened, initial: true) {
             inbox.takeOpened().first.map { importer.offer($0) }
@@ -116,11 +117,7 @@ struct LibraryView: View {
         .onChange(of: inbox.deleteRequested) {
             if inbox.deleteRequested { deleteTarget = library.selection == Library.progressionId ? nil : library.selection; inbox.deleteRequested = false }
         }
-        .task {
-            library.onFinished = { Notifier.post($0) }
-            if library.selection == nil { library.selection = stored }
-            await library.poll()
-        }
+        .task { if library.selection == nil { library.selection = stored } }
         .onChange(of: library.selection) { stored = library.selection }
     }
 

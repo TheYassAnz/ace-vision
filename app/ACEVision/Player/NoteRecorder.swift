@@ -43,6 +43,8 @@ final class NotesSession {
     private(set) var loadError: String?
     private(set) var matchId: String?
     private(set) var saved: [Note] = []
+    /// Bumped after each successful save: the match (its score) and the library reload.
+    private(set) var revision = 0
 
     var hasUnsaved: Bool { active && recorder.hasUnsaved }
     /// Notes shown in the "Mes notes" row.
@@ -71,10 +73,11 @@ final class NotesSession {
         defer { saving = false }
         do {
             let s = try await api.saveNotes(id, recorder.notes)
-            recorder.markSaved(); saved = recorder.notes
+            recorder.markSaved(); saved = recorder.notes; revision += 1
             message = "Enregistré : \(s.foundRate.percentText) trouvés, \(s.classRate.percentText) bien classés."
         } catch {
-            message = "Échec de l'enregistrement. Vérifie que l'analyse est terminée puis réessaie."
+            let detail = error.localizedDescription
+            message = detail == APIError.unreachable.message ? "Échec de l'enregistrement. Vérifie que l'analyse est terminée puis réessaie." : detail
         }
         AccessibilityNotification.Announcement(message ?? "").post()
         return !recorder.hasUnsaved

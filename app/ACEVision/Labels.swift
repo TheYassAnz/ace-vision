@@ -50,9 +50,9 @@ func clock(_ t: Double) -> String {
                      : d.formatted(.time(pattern: .minuteSecond(padMinuteToLength: 1)).locale(frFR))
 }
 
-/// `created` is a zone-less local time ("2026-03-04T10:00:00"): read it in `zone`, not GMT.
-func parseCreated(_ s: String, in zone: TimeZone = .current) -> Date? {
-    try? Date(s, strategy: Date.ISO8601FormatStyle(timeZone: zone).year().month().day().dateTimeSeparator(.standard).time(includingFractionalSeconds: false))
+/// `created` is ffprobe's UTC `creation_time` cut to "2026-03-04T10:00:00" (no `Z`): read it as GMT.
+func parseCreated(_ s: String) -> Date? {
+    try? Date(s, strategy: Date.ISO8601FormatStyle(timeZone: .gmt).year().month().day().dateTimeSeparator(.standard).time(includingFractionalSeconds: false))
 }
 
 func dayText(_ d: Date, in zone: TimeZone = .current) -> String {
