@@ -57,25 +57,25 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(store, "probe", lambda p: VideoInfo(
         width=1116, height=1986, fps=30, duration_s=75, n_frames=30, rotation=-90, created="2026-03-04T10:00:00"))
     monkeypatch.setattr(runner, "start", lambda mid: True)
+    monkeypatch.setenv("ACE_TOKEN", "t")
 
 
 def test_notes_endpoint_saves_score(env):
-    client = TestClient(app, base_url="http://127.0.0.1:8765", headers={"Origin": "http://127.0.0.1:8765"})
+    client = TestClient(app, base_url="http://127.0.0.1", headers={"Authorization": "Bearer t"})
     m = store.create_match(io.BytesIO(b"x"), "IMG_1.mov", "net", "")
     m.status, m.strokes = "done", [S(1)]
     store.save(m)
-    assert "Noter mes coups" in client.get(f"/matchs/{m.id}/noter").text
     r = client.post(f"/matchs/{m.id}/notes", json=[{"t": 1.1, "kind": "forehand"}, {"t": 9, "kind": "serve"}])
     assert r.status_code == 200
     sc = store.load(m.id).score
     assert sc.n_notes == 2 and sc.found_rate == 0.5 and sc.class_rate == 1.0
     assert json.loads((store.match_dir(m.id) / "notes.json").read_text())[0]["t"] == 1.1
-    assert "Fiabilité : 50 % de tes coups trouvés, 100 % bien classés" in client.get(f"/matchs/{m.id}").text
+    assert client.get(f"/matchs/{m.id}").json()["score"]["found_rate"] == 0.5
     assert client.post(f"/matchs/{m.id}/notes", json=[{"t": 1, "kind": "nope"}]).status_code == 422
 
 
 def test_notes_validation_and_running_guard(env):
-    client = TestClient(app, base_url="http://127.0.0.1:8765", headers={"Origin": "http://127.0.0.1:8765"})
+    client = TestClient(app, base_url="http://127.0.0.1", headers={"Authorization": "Bearer t"})
     m = store.create_match(io.BytesIO(b"x"), "IMG_1.mov", "net", "")
     url = f"/matchs/{m.id}/notes"
     for body in ('[{"t": NaN, "kind": "forehand"}]', '[{"t": -1, "kind": "forehand"}]', '[]', '[{"t": 999, "kind": "forehand"}]'):
@@ -83,11 +83,6 @@ def test_notes_validation_and_running_guard(env):
     m.status = "running"
     store.save(m)
     assert client.post(url, json=[{"t": 1, "kind": "forehand"}]).status_code == 409
-
-
-def test_plural_keys_on_count():
-    from ace.web.app import of_total
-    assert of_total(1, 25, "forehand") == "1 coup droit sur 25" and of_total(11, 25, "forehand") == "11 coups droits sur 25"
 
 
 def test_reanalysis_recomputes_score(env, monkeypatch):

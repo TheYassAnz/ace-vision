@@ -1,9 +1,0 @@
-{% extends "base.html" %}
-{% block title %}Analyse en cours — Ace Vision{% endblock %}
-{% block content %}
-<h1>{{ m.title or m.id }}</h1>
-<p>Analyse en cours…</p>
-<progress id="bar" max="1" value="{{ m.progress }}"></progress>
-<script src="/static/app.js"></script>
-<script>pollStatus("/matchs/{{ m.id }}/statut");</script>
-{% endblock %}

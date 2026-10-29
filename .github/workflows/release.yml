@@ -1,0 +1,22 @@
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: astral-sh/setup-uv@v10.3.3
+      - run: brew install xcodegen
+      - run: uv sync
+      - run: uv run pytest
+      - run: |
+          xcodegen generate --spec app/project.yml
+          xcodebuild test -project app/ACEVision.xcodeproj -scheme ACEVision -destination 'platform=macOS'
+      - run: bash scripts/build_app.sh "${GITHUB_REF_NAME#v}"
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: dist/ACE-Vision-*.zip

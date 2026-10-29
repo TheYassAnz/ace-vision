@@ -7,9 +7,9 @@ import tempfile
 import threading
 from datetime import date
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, get_args
 
-from ace.domain import Match, Settings, View
+from ace.domain import DefectId, Match, Settings, StrokeKind, View
 from ace.notes import Note
 from ace.video import probe
 
@@ -68,6 +68,30 @@ def list_matches() -> list[Match]:
             out.append(Match.model_validate_json(f.read_text()))
         except (OSError, ValueError):  # unreadable match.json: skip, don't hide the others
             continue
+    return out
+
+
+def delete_match(id: str) -> None:
+    with _lock:
+        d = match_dir(id)
+        try:
+            running = load(id).status == "running"
+        except (OSError, ValueError):  # unreadable match.json: nothing to protect
+            running = False
+        if running:
+            raise UserError("Ce match est en cours d'analyse.")
+        shutil.rmtree(d)
+
+
+def defect_rates(m: Match) -> list[dict]:
+    """Share of each stroke kind's strokes carrying each defect, for defects seen at least once."""
+    out = []
+    for kind in get_args(StrokeKind):
+        strokes = [s for s in m.strokes if s.kind == kind]
+        for defect in get_args(DefectId):
+            n = sum(defect in s.defects for s in strokes)
+            if n:
+                out.append({"kind": kind, "defect": defect, "rate": n / len(strokes)})
     return out
 
 
