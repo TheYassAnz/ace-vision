@@ -100,6 +100,13 @@ def relaunch(id: str):
     return {"queued": not runner.start(get_match(id).id)}
 
 
+@app.post("/matchs/{id}/arreter", status_code=202)
+def stop(id: str):
+    if not runner.stop(get_match(id).id):
+        return JSONResponse({"detail": "Aucune analyse en cours pour ce match."}, status_code=409)
+    return Response(status_code=202)
+
+
 @app.delete("/matchs/{id}", status_code=204)
 def delete(id: str):
     get_match(id)

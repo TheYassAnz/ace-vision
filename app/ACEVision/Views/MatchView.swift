@@ -9,6 +9,7 @@ struct MatchView: View {
     @State private var player: PlayerModel?
     @State private var loadError: String?
     @State private var relaunchMessage: String?
+    @State private var stopping = false
 
     var body: some View {
         Group {
@@ -31,6 +32,9 @@ struct MatchView: View {
             VStack(spacing: 12) {
                 ProgressView(value: s.progress).frame(maxWidth: 320)
                 Text("En cours… \(s.progress.percentText)").monospacedDigit()
+                Button("Arrêter l'analyse", role: .destructive) { Task { await stop(s.id) } }
+                    .disabled(stopping)
+                if let m = relaunchMessage { Text(m).foregroundStyle(.secondary) }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .failed, .pending:
@@ -81,6 +85,7 @@ struct MatchView: View {
     }
 
     private func load(_ id: String) async {
+        stopping = false  // the status changed: the stop went through
         guard library.matches.first(where: { $0.id == id })?.status == .done else { return }
         do {
             let m = try await api.match(id)
@@ -91,6 +96,13 @@ struct MatchView: View {
             match = m; loadError = nil
         }
         catch { loadError = error.localizedDescription }
+    }
+
+    private func stop(_ id: String) async {
+        stopping = true
+        relaunchMessage = nil
+        do { try await api.stop(id) } catch { relaunchMessage = error.localizedDescription; stopping = false }
+        await library.refresh()
     }
 
     private func relaunch(_ id: String) async {

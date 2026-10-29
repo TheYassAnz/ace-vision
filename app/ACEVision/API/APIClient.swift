@@ -58,6 +58,7 @@ final class APIClient: Sendable {
         return q.queued
     }
 
+    func stop(_ id: String) async throws { _ = try await send("POST", "/matchs/\(id)/arreter") }
     func delete(_ id: String) async throws { _ = try await send("DELETE", "/matchs/\(id)") }
     func notes(_ id: String) async throws -> [Note] { try await get("/matchs/\(id)/notes") }
 

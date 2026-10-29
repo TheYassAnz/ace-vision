@@ -11,6 +11,7 @@ class JobRunner:
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self.running_id: str | None = None
+        self._stop = threading.Event()
 
     def start(self, match_id: str) -> bool:
         with self._lock:
@@ -18,6 +19,7 @@ class JobRunner:
                 return False
             t = threading.Thread(target=self._run, args=(match_id,), daemon=True)
             self.running_id = match_id  # before start(): _run clears it when done
+            self._stop.clear()
             try:
                 t.start()
             except Exception:
@@ -26,9 +28,16 @@ class JobRunner:
             self._thread = t
             return True
 
+    def stop(self, match_id: str) -> bool:
+        with self._lock:
+            if self.running_id != match_id:
+                return False
+            self._stop.set()
+            return True
+
     def _run(self, match_id: str) -> None:
         try:
-            analyse(match_id)
+            analyse(match_id, self._stop.is_set)
         finally:
             self.running_id = None
 
