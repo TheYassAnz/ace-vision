@@ -102,7 +102,7 @@ def test_coverage_and_unmeasured_strokes(match, monkeypatch):
 
 def test_runner_one_at_a_time(match, monkeypatch):
     gate = threading.Event()
-    monkeypatch.setattr(jobs, "analyse", lambda id: gate.wait(5))
+    monkeypatch.setattr(jobs, "analyse", lambda id, should_stop: gate.wait(5))
     r = JobRunner()
     assert r.start(match.id) is True and r.running_id == match.id
     assert r.start(match.id) is False
@@ -110,6 +110,30 @@ def test_runner_one_at_a_time(match, monkeypatch):
     r._thread.join(5)
     assert r.running_id is None and r.start(match.id) is True
     r._thread.join(5)
+
+
+def test_stop_resets_match_to_pending(match, monkeypatch):
+    monkeypatch.setattr(pipeline, "extract_pose", _fake_pose)
+    pipeline.analyse(match.id, should_stop=lambda: True)
+    m = store.load(match.id)
+    assert (m.status, m.progress, m.error, m.strokes) == ("pending", 0.0, None, [])
+
+
+def test_runner_stop_only_targets_running_match(match, monkeypatch):
+    seen = threading.Event()
+
+    def fake(id, should_stop):
+        while not should_stop():
+            threading.Event().wait(0.01)
+        seen.set()
+
+    monkeypatch.setattr(jobs, "analyse", fake)
+    r = JobRunner()
+    assert r.stop(match.id) is False
+    r.start(match.id)
+    assert r.stop("other") is False and r.stop(match.id) is True
+    r._thread.join(5)
+    assert seen.is_set() and r.running_id is None
 
 
 def test_recover_interrupted(match):

@@ -132,6 +132,15 @@ def test_relaunch_while_busy_is_queued(monkeypatch):
     assert client.post(f"/matchs/{m.id}/relancer").json() == {"queued": True}
 
 
+def test_stop(monkeypatch):
+    m = make()
+    assert client.post("/matchs/nope/arreter").status_code == 404
+    assert client.post(f"/matchs/{m.id}/arreter").status_code == 409
+    monkeypatch.setattr(runner, "running_id", m.id)
+    assert client.post(f"/matchs/{m.id}/arreter").status_code == 202
+    runner._stop.clear()
+
+
 def test_runner_is_truth_for_running(monkeypatch):
     m = make()  # match.json still says pending: the analysis thread has not saved yet
     monkeypatch.setattr(runner, "running_id", m.id)

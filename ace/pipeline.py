@@ -2,6 +2,7 @@ import logging
 import math
 import subprocess
 import time
+from collections.abc import Callable
 
 import numpy as np
 
@@ -20,7 +21,11 @@ SAVE_EVERY_S = 2.0
 FAILURE_REASONS = {subprocess.CalledProcessError: "vidéo illisible"}  # ffprobe rejected the file
 
 
-def analyse(match_id: str) -> None:
+class Cancelled(Exception):
+    pass
+
+
+def analyse(match_id: str, should_stop: Callable[[], bool] = lambda: False) -> None:
     m = None
     try:
         m = store.load(match_id)
@@ -35,12 +40,16 @@ def analyse(match_id: str) -> None:
 
         def on_progress(p: float) -> None:
             nonlocal last_save
+            if should_stop():  # threads cannot be killed: the pose loop stops itself at the next frame
+                raise Cancelled
             m.progress = p * POSE_SHARE
             if time.monotonic() - last_save >= SAVE_EVERY_S:
                 store.save(m)
                 last_save = time.monotonic()
 
         kp = extract_pose(store.match_dir(match_id) / m.video_file, info, on_progress)
+        if should_stop():
+            raise Cancelled
         np.savez_compressed(store.pose_path(match_id), kp=kp)
         m.coverage = float(np.isfinite(kp[:, [L_HIP, R_HIP], :2]).all(axis=(1, 2)).mean()) if len(kp) else 0.0
         m.strokes = detect_strokes(kp, info.fps, m.settings)
@@ -56,6 +65,8 @@ def analyse(match_id: str) -> None:
         m.score = score_detection(m.strokes, notes) if notes else None
         m.rallies = None  # net view: rallies not computable (rear view handled by a later task)
         m.status, m.progress = "done", 1.0
+    except Cancelled:
+        m.status, m.progress = "pending", 0.0  # results were wiped at start; pending also skips the failure notification
     except Exception as e:
         if m is None:
             log.exception("analysis of %s failed before loading the match", match_id)
