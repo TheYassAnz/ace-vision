@@ -1,0 +1,66 @@
+name: ACEVision
+options:
+  bundleIdPrefix: io.github.acevision
+  deploymentTarget:
+    macOS: "15.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    ARCHS: arm64
+    ONLY_ACTIVE_ARCH: YES
+    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    MARKETING_VERSION: "0.1.0"
+targets:
+  ACEVision:
+    type: application
+    platform: macOS
+    sources: [ACEVision]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.acevision.app
+        INFOPLIST_FILE: ACEVision/Info.plist
+        ENABLE_APP_SANDBOX: NO  # the app launches a process and reads paths the user picks
+        ENABLE_HARDENED_RUNTIME: NO
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_USER_SCRIPT_SANDBOXING: NO  # the copy phase reads the repo root
+    postBuildScripts:
+      - name: Copy engine
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          ROOT="$SRCROOT/.."
+          RES="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+          mkdir -p "$RES/engine" "$RES/bin"
+          rsync -a --delete --exclude __pycache__ "$ROOT/ace" "$RES/engine/"
+          cp "$ROOT/pyproject.toml" "$ROOT/uv.lock" "$RES/engine/"
+          if [ -f "$ROOT/.python-version" ]; then cp "$ROOT/.python-version" "$RES/engine/"; fi
+          # Task 8's release script downloads uv here; dev builds go without it
+          if [ -f "$SRCROOT/build/bin/uv" ]; then cp "$SRCROOT/build/bin/uv" "$RES/bin/uv"; fi
+  ACEVisionTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - ACEVisionTests
+    dependencies:
+      - target: ACEVision
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.acevision.tests
+schemes:
+  ACEVision:
+    build:
+      targets:
+        ACEVision: all
+        ACEVisionTests: [test]
+    run:
+      environmentVariables:
+        - variable: ACE_REPO
+          value: $(SRCROOT)/..
+          isEnabled: true
+    test:
+      targets: [ACEVisionTests]
+      environmentVariables:
+        - variable: ACE_REPO
+          value: $(SRCROOT)/..
+          isEnabled: true

@@ -2,6 +2,8 @@
 
 Date : 2026-10-23 · Statut : validé par l’utilisateur (2026-10-23)
 
+> L'app macOS native qui remplace l'interface web est décrite dans `docs/superpowers/specs/2026-10-28-app-macos-design.md`.
+
 ## 1. Intention
 
 Un joueur amateur filme ses matchs de tennis avec son iPhone. Il veut savoir **comment améliorer son jeu** — pas seulement des chiffres. Déclencheur : un match où ses coups droits « ne passaient pas » sans qu'il sache pourquoi ni quoi changer.

@@ -1,0 +1,26 @@
+[project]
+name = "ace-vision"
+version = "0.1.0"
+requires-python = "==3.12.*"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "ultralytics",
+    "numpy",
+    "scipy",
+    "pydantic",
+    "lap>=0.5.13",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "httpx",
+]
+
+[tool.pytest.ini_options]
+markers = ["slow: vraies vidéos/modèles"]
+pythonpath = ["."]
+addopts = "-m 'not slow'"
+filterwarnings = ["error", "ignore:Using `httpx` with `starlette.testclient` is deprecated"]
+

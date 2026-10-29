@@ -1,0 +1,64 @@
+{
+  "id": "2026-03-04-img-1",
+  "title": "vs Karim",
+  "view": "net",
+  "status": "done",
+  "progress": 0.0,
+  "error": null,
+  "video_file": "video.mov",
+  "info": {
+    "width": 1116,
+    "height": 1986,
+    "fps": 30.0,
+    "duration_s": 75.0,
+    "n_frames": 30,
+    "rotation": -90,
+    "created": "2026-03-04T10:00:00"
+  },
+  "settings": {
+    "handedness": "right",
+    "backhand_hands": 2
+  },
+  "strokes": [
+    {
+      "t": 1.5,
+      "frame": 45,
+      "kind": "forehand",
+      "defects": [
+        "late_prep"
+      ],
+      "outcome": "unknown"
+    },
+    {
+      "t": 6.2,
+      "frame": 186,
+      "kind": "backhand",
+      "defects": [],
+      "outcome": "in"
+    }
+  ],
+  "rallies": null,
+  "findings": [
+    {
+      "kind": "forehand",
+      "defect": "late_prep",
+      "count": 1,
+      "total": 1,
+      "title": "Préparation tardive",
+      "text": "Prépare plus tôt.",
+      "drill": "Raquette en arrière dès le rebond.",
+      "clip_times": [
+        1.5
+      ]
+    }
+  ],
+  "score": {
+    "n_notes": 2,
+    "n_detected": 2,
+    "found_rate": 1.0,
+    "class_rate": 0.5,
+    "false_hits": 0
+  },
+  "coverage": null,
+  "n_unmeasured": 0
+}

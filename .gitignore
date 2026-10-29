@@ -6,3 +6,6 @@ models/
 __pycache__/
 *.pt
 .DS_Store
+app/ACEVision.xcodeproj/
+app/build/
+dist/
