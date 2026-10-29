@@ -7,7 +7,7 @@ struct PlayerView: View {
     let notes: NotesSession
     let api: APIClient
     @State private var leaving = false
-    @FocusState private var keysFocused: Bool
+    @State private var keyMonitor: Any?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -19,6 +19,8 @@ struct PlayerView: View {
             }
             controls
         }
+        .onChange(of: notes.active, initial: true) { _, on in on ? installKeys() : removeKeys() }
+        .onDisappear { removeKeys() }
         .confirmationDialog("Enregistrer tes notes ?", isPresented: $leaving, titleVisibility: .visible) {
             Button("Enregistrer les notes") { Task { if await notes.save(api) { notes.active = false } } }
             Button("Ne pas enregistrer") { notes.discard() }
@@ -29,7 +31,7 @@ struct PlayerView: View {
     @ViewBuilder private var controls: some View {
         HStack {
             Button(notes.active ? "Quitter la notation" : "Noter mes coups") {
-                if !notes.active { notes.start(); keysFocused = true }
+                if !notes.active { notes.start() }
                 else if notes.hasUnsaved { leaving = true }
                 else { notes.discard() }
             }
@@ -45,14 +47,30 @@ struct PlayerView: View {
         if notes.active {
             Text("Appuie sur D (coup droit), R (revers), S (service) ou A (autre) à chaque coup. ⌫ annule la dernière note, espace lance ou met en pause la vidéo.")
                 .font(.callout).foregroundStyle(.secondary)
-                .focusable().focused($keysFocused)
-                .onKeyPress(phases: .down) { press in
-                    if press.key == .delete && press.modifiers.isEmpty { notes.recorder.undo(); return .handled }
-                    if press.key == .space && press.modifiers.isEmpty { model.togglePlay(); return .handled }
-                    // Shift and Caps Lock only change the case of the letter
-                    if press.modifiers.isDisjoint(with: [.command, .control, .option]), let c = press.characters.first, notes.recorder.handle(key: c, at: model.currentTime) { return .handled }
-                    return .ignored
+        }
+    }
+
+    private func removeKeys() {
+        if let m = keyMonitor { NSEvent.removeMonitor(m) }
+        keyMonitor = nil
+    }
+
+    private func installKeys() {
+        removeKeys()
+        let notes = notes, model = model
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let chars = event.characters, code = event.keyCode, mods = event.modifierFlags
+            let handled = MainActor.assumeIsolated {
+                let editing = NSApp.keyWindow?.firstResponder is NSText
+                switch NoteKeys.action(characters: chars, keyCode: code, modifiers: mods, editingText: editing) {
+                case .stroke(let c): _ = notes.recorder.handle(key: c, at: model.player.currentTime().seconds)
+                case .undo: notes.recorder.undo()
+                case .playPause: model.togglePlay()
+                case nil: return false
                 }
+                return true
+            }
+            return handled ? nil : event
         }
     }
 }
