@@ -2,16 +2,14 @@
 
 Application locale pour Mac qui analyse des vidéos de tennis filmées à l'iPhone. Elle repère chaque coup (coup droit, revers, service), calcule un bilan du match et signale les défauts de technique les plus fréquents avec des conseils. Tout tourne sur votre Mac : rien n'est envoyé sur Internet.
 
+ACE Vision devient une app macOS native (SwiftUI) ; le moteur Python tourne en sous-processus et expose une API JSON locale. Le mode d'emploi viendra avec l'app.
+
 ## Installation
 
 ```
 brew install uv
 uv sync
 ```
-
-## Premier lancement
-
-Double-cliquez sur `ACE Vision.command`. macOS peut demander l'autorisation d'ouvrir le fichier (clic droit > Ouvrir la première fois). Safari s'ouvre sur l'historique des matchs. Pour y accéder plus vite, glissez l'icône dans le Dock.
 
 ## Filmer
 
@@ -34,14 +32,6 @@ puis :
 ```
 ffmpeg -f concat -safe 0 -i liste.txt -c copy match.mov
 ```
-
-## Arrêter le serveur
-
-```
-pkill -f "python -m ace"
-```
-
-Les journaux sont dans `data/server.log`.
 
 ## Données
 

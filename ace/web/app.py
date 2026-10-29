@@ -1,33 +1,30 @@
+import hmac
 import logging
+import os
 from pathlib import Path
 from typing import Annotated, Literal
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from pydantic import Field
+from fastapi import FastAPI, HTTPException, Request, Response
+from pydantic import BaseModel, Field
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from ace import store
-from ace.domain import STROKE_LABELS, Match, Settings
+from ace.domain import Match, Settings, View
 from ace.jobs import runner
 from ace.notes import Note, score_detection
 
-HERE = Path(__file__).parent
 log = logging.getLogger(__name__)
 app = FastAPI()
-ORIGINS = ("http://127.0.0.1:8765", "http://localhost:8765")
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])  # DNS rebinding
 
 
 @app.middleware("http")
-async def same_origin_only(request: Request, call_next):  # CSRF: browsers always send Origin/Referer on cross-site POSTs
-    if request.method not in ("GET", "HEAD"):
-        src = request.headers.get("origin") or request.headers.get("referer") or ""
-        if not any(src == o or src.startswith(o + "/") for o in ORIGINS):
-            return JSONResponse({"detail": "Origine refusée."}, status_code=403)
+async def token_only(request: Request, call_next):  # the app passes a random token per launch; no other local process knows it
+    sent = request.headers.get("authorization", "")
+    if not hmac.compare_digest(sent.encode(), f"Bearer {os.environ.get('ACE_TOKEN', '')}".encode()) or not os.environ.get("ACE_TOKEN"):
+        return JSONResponse({"detail": "Jeton manquant ou invalide."}, status_code=401)
     return await call_next(request)
 
 
@@ -36,32 +33,10 @@ async def invalid_request(request: Request, exc: RequestValidationError):  # def
     return JSONResponse({"detail": "Requête invalide."}, status_code=422)
 
 
-app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
-templates = Jinja2Templates(directory=HERE / "templates")
-VIEW_LABELS = {"net": "Vue filet", "rear": "Vue arrière"}
-STATUS_LABELS = {"pending": "Pas encore analysé", "running": "En cours", "done": "Terminé", "failed": "Échec"}
-QUEUED_MSG = "Une analyse est déjà en cours. Celle-ci démarrera quand tu cliqueras sur Relancer."
-
-
-PLURALS = {"forehand": "coups droits", "backhand": "revers", "serve": "services", "other": "autres"}
-SINGULARS = {"forehand": "coup droit", "backhand": "revers", "serve": "service", "other": "autre"}
-DEFECT_LABELS = {"late_prep": "Préparation tardive", "small_turn": "Épaules peu tournées",
-                 "straight_legs": "Jambes tendues", "narrow_stance": "Appuis serrés"}
-
-
-def of_total(count: int, total: int, kind: str) -> str:
-    return f"{count} {(SINGULARS if count < 2 else PLURALS)[kind]} sur {total}"
-
-
-def rally_summary(m: Match) -> dict | None:
-    if m.view != "rear" or m.rallies is None:
-        return None
-    long = [r.n_hits for r in m.rallies if r.n_hits >= 2]  # a lone hit is not an exchange length
-    return {"n": len(m.rallies), "mean": f"{sum(long) / len(long):.1f}".replace(".", ",") if long else "—", "max": max(long, default="—")}
-
-
-def render(request: Request, name: str, **ctx):
-    return templates.TemplateResponse(request, name, {"view_labels": VIEW_LABELS, "stroke_labels": STROKE_LABELS, **ctx})
+class ImportBody(BaseModel):
+    path: str
+    view: View
+    title: str = ""
 
 
 def get_match(id: str) -> Match:
@@ -78,73 +53,68 @@ def live_status(m: Match) -> str:
     return "failed" if m.status == "running" else m.status
 
 
-def see(id: str) -> RedirectResponse:
-    return RedirectResponse(f"/matchs/{id}", status_code=303)
+def summary(m: Match) -> dict:
+    return {"id": m.id, "title": m.title, "view": m.view, "status": live_status(m), "progress": m.progress, "error": m.error,
+            "created": m.info.created if m.info else None, "duration_s": m.info.duration_s if m.info else None,
+            "score": m.score.model_dump() if m.score else None, "defect_rates": store.defect_rates(m)}
 
 
-@app.get("/")
-def history(request: Request):
-    return render(request, "history.html", matches=store.list_matches(), status_labels=STATUS_LABELS)
+@app.get("/health")
+def health():
+    return {"ok": True}
 
 
-@app.get("/ajouter")
-def add_form(request: Request, error: str | None = None):
-    return render(request, "add.html", error=error)
+@app.get("/matchs")
+def history():
+    return [summary(m) for m in store.list_matches()]
 
 
-@app.post("/matchs")
-def create(request: Request, video: UploadFile = File(...), view: Literal["net", "rear"] = Form(...), title: str = Form("")):
+@app.post("/matchs", status_code=201)
+def create(body: ImportBody):
     try:
-        m = store.create_match(video.file, video.filename or "", view, title.strip())
+        with open(body.path, "rb") as f:
+            m = store.create_match(f, Path(body.path).name, body.view, body.title.strip())
+    except (FileNotFoundError, IsADirectoryError):
+        return JSONResponse({"detail": "Fichier introuvable."}, status_code=422)
     except store.UserError as e:
-        return render(request, "add.html", error=str(e))
+        return JSONResponse({"detail": str(e)}, status_code=422)
     except Exception:  # probe/ffprobe failure on a corrupt or non-video file; never show raw English text
-        log.exception("import of %r failed", video.filename)
-        return render(request, "add.html", error="Ce fichier n'est pas une vidéo lisible.")
-    if not runner.start(m.id):
-        return RedirectResponse(f"/matchs/{m.id}?attente=1", status_code=303)
-    return see(m.id)
+        log.exception("import of %r failed", body.path)
+        return JSONResponse({"detail": "Ce fichier n'est pas une vidéo lisible."}, status_code=422)
+    return {"match": summary(m), "queued": not runner.start(m.id)}
 
 
 @app.get("/matchs/{id}")
-def match_page(request: Request, id: str, attente: int = 0):
+def match_detail(id: str):
     m = get_match(id)
     status = live_status(m)
     if status == "failed" and m.status == "running":
-        m.status, m.error = "failed", "Analyse interrompue."
-    page = {"running": "match_running.html", "done": "match_report.html"}.get(status, "match_failed.html")
-    counts = {k: sum(s.kind == k for s in m.strokes) for k in STROKE_LABELS}
-    return render(request, page, m=m, queued_msg=QUEUED_MSG if attente else None, counts=counts,
-                  rallies=rally_summary(m), of_total=of_total, defect_labels=DEFECT_LABELS)
-
-
-@app.get("/matchs/{id}/statut")
-def status(id: str):
-    m = get_match(id)
-    return JSONResponse({"status": live_status(m), "progress": m.progress, "error": m.error})
+        m.error = "Analyse interrompue."
+    m.status = status
+    return m.model_dump(mode="json", exclude={"strokes": {"__all__": {"metrics"}}})
 
 
 @app.post("/matchs/{id}/relancer")
 def relaunch(id: str):
-    m = get_match(id)
-    if not runner.start(m.id):
-        return RedirectResponse(f"/matchs/{m.id}?attente=1", status_code=303)
-    return see(m.id)
+    return {"queued": not runner.start(get_match(id).id)}
 
 
-@app.get("/matchs/{id}/video")
-def video(id: str):
-    m = get_match(id)
-    path = store.match_dir(id) / m.video_file
-    if not path.is_file():
-        raise HTTPException(404, "Vidéo introuvable.")
-    # Starlette's FileResponse answers Range requests with 206 (needed by Safari).
-    return FileResponse(path, media_type="video/quicktime" if path.suffix.lower() == ".mov" else "video/mp4")
+@app.delete("/matchs/{id}", status_code=204)
+def delete(id: str):
+    get_match(id)
+    try:
+        if runner.running_id == id:
+            raise store.UserError("Ce match est en cours d'analyse.")
+        store.delete_match(id)
+    except store.UserError as e:
+        return JSONResponse({"detail": str(e)}, status_code=409)
+    return Response(status_code=204)
 
 
-@app.get("/matchs/{id}/noter")
-def notes_form(request: Request, id: str):
-    return render(request, "notes.html", m=get_match(id))
+@app.get("/matchs/{id}/notes")
+def notes_list(id: str):
+    get_match(id)
+    return store.load_notes(id) or []
 
 
 @app.post("/matchs/{id}/notes")
@@ -162,11 +132,11 @@ def notes_save(id: str, notes: Annotated[list[Note], Field(min_length=1, max_len
 
 
 @app.get("/reglages")
-def settings_form(request: Request, saved: int = 0):
-    return render(request, "settings.html", s=store.load_settings(), saved=saved)
+def settings_get():
+    return store.load_settings()
 
 
-@app.post("/reglages")
-def settings_save(handedness: Literal["right", "left"] = Form(...), backhand_hands: Literal["1", "2"] = Form(...)):
-    store.save_settings(Settings(handedness=handedness, backhand_hands=int(backhand_hands)))
-    return RedirectResponse("/reglages?saved=1", status_code=303)
+@app.put("/reglages")
+def settings_put(s: Settings):
+    store.save_settings(s)
+    return s

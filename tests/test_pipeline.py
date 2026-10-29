@@ -64,9 +64,11 @@ def test_unreadable_video_reason_is_french(match, monkeypatch):
     assert store.load(match.id).error == "L'analyse a échoué : vidéo illisible."
 
 
-def test_nan_metrics_survive_reload_and_report_renders(match, monkeypatch):
+def test_nan_metrics_survive_reload_and_match_is_served(match, monkeypatch):
     from fastapi.testclient import TestClient
     from ace.web.app import app
+
+    monkeypatch.setenv("ACE_TOKEN", "t")
 
     def pose(path, info, on_progress):
         kp = _fake_pose(path, info, on_progress)
@@ -78,8 +80,8 @@ def test_nan_metrics_survive_reload_and_report_renders(match, monkeypatch):
     m = store.load(match.id)
     assert m.status == "done" and m.strokes and np.isnan(m.strokes[0].metrics["stance_ratio"])
     assert [x.id for x in store.list_matches()] == [match.id]
-    r = TestClient(app, base_url="http://127.0.0.1:8765").get(f"/matchs/{match.id}")
-    assert r.status_code == 200 and "Vue d'ensemble" in r.text
+    r = TestClient(app, base_url="http://127.0.0.1", headers={"Authorization": "Bearer t"}).get(f"/matchs/{match.id}")
+    assert r.status_code == 200 and r.json()["status"] == "done"
 
 
 def test_coverage_and_unmeasured_strokes(match, monkeypatch):
