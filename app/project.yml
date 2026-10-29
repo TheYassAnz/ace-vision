@@ -21,6 +21,20 @@ targets:
         ENABLE_APP_SANDBOX: NO  # the app launches a process and reads paths the user picks
         ENABLE_HARDENED_RUNTIME: NO
         GENERATE_INFOPLIST_FILE: NO
+        ENABLE_USER_SCRIPT_SANDBOXING: NO  # the copy phase reads the repo root
+    postBuildScripts:
+      - name: Copy engine
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          ROOT="$SRCROOT/.."
+          RES="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+          mkdir -p "$RES/engine" "$RES/bin"
+          rsync -a --delete --exclude __pycache__ "$ROOT/ace" "$RES/engine/"
+          cp "$ROOT/pyproject.toml" "$ROOT/uv.lock" "$RES/engine/"
+          if [ -f "$ROOT/.python-version" ]; then cp "$ROOT/.python-version" "$RES/engine/"; fi
+          # Task 8's release script downloads uv here; dev builds go without it
+          if [ -f "$SRCROOT/build/bin/uv" ]; then cp "$SRCROOT/build/bin/uv" "$RES/bin/uv"; fi
   ACEVisionTests:
     type: bundle.unit-test
     platform: macOS
