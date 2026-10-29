@@ -13,16 +13,20 @@ def _dominant_wrist(settings: Settings) -> int:
     return R_WR if settings.handedness == "right" else L_WR
 
 
-def detect_hits(kp: np.ndarray, fps: float, settings: Settings) -> list[int]:
-    """Frames of the player's hits: peaks of the dominant wrist's speed (torso lengths / s)."""
+def wrist_speed(kp: np.ndarray, fps: float, settings: Settings) -> np.ndarray:
+    """Per-frame speed of the dominant wrist in the image plane (torso lengths / s), smoothed; zeros without a torso."""
     torso = torso_length(kp)
     if not np.isfinite(torso) or torso <= 0:
-        return []
+        return np.zeros(len(kp))
     wrist = kp[:, _dominant_wrist(settings), :2]
     speed = np.zeros(len(kp))
     speed[1:] = np.linalg.norm(np.diff(wrist, axis=0), axis=1) * fps / torso
-    speed = np.convolve(np.nan_to_num(speed), np.ones(3) / 3, mode="same")
-    peaks, _ = find_peaks(speed, height=HIT_MIN_SPEED, distance=round(MIN_HIT_GAP_S * fps))
+    return np.convolve(np.nan_to_num(speed), np.ones(3) / 3, mode="same")
+
+
+def detect_hits(kp: np.ndarray, fps: float, settings: Settings) -> list[int]:
+    """Frames of the player's hits: peaks of the dominant wrist's speed."""
+    peaks, _ = find_peaks(wrist_speed(kp, fps, settings), height=HIT_MIN_SPEED, distance=round(MIN_HIT_GAP_S * fps))
     return [int(p) for p in peaks]
 
 
@@ -79,7 +83,9 @@ def classify_stroke(kp: np.ndarray, frame: int, fps: float, settings: Settings, 
 def detect_strokes(kp: np.ndarray, fps: float, settings: Settings) -> list[Stroke]:
     strokes, prev = [], None
     right_dir = body_right_dir(kp)
+    speed = wrist_speed(kp, fps, settings)
     for f in detect_hits(kp, fps, settings):
-        strokes.append(Stroke(t=f / fps, frame=f, kind=classify_stroke(kp, f, fps, settings, prev, right_dir)))
+        strokes.append(Stroke(t=f / fps, frame=f, kind=classify_stroke(kp, f, fps, settings, prev, right_dir),
+                              wrist_speed=float(speed[f])))
         prev = f
     return strokes

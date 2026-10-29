@@ -18,6 +18,7 @@ struct Stroke: Codable, Sendable, Hashable {
     let kind: StrokeKind
     let defects: [DefectId]
     let outcome: Outcome
+    var wristSpeed: Double? = nil  // torso lengths / s; nil on matches analysed before it existed. var: optional in the memberwise init
 }
 
 struct Rally: Codable, Sendable, Hashable {

@@ -27,14 +27,16 @@
       "defects": [
         "late_prep"
       ],
-      "outcome": "unknown"
+      "outcome": "unknown",
+      "wrist_speed": null
     },
     {
       "t": 6.2,
       "frame": 186,
       "kind": "backhand",
       "defects": [],
-      "outcome": "in"
+      "outcome": "in",
+      "wrist_speed": 8.5
     }
   ],
   "rallies": null,

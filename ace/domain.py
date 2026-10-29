@@ -40,6 +40,7 @@ class Stroke(BaseModel):
     metrics: dict[str, float] = Field(default_factory=dict)
     defects: list[DefectId] = Field(default_factory=list)
     outcome: Outcome = "unknown"
+    wrist_speed: float | None = None  # torso lengths / s at impact; None on matches analysed before it existed
 
 
 class Rally(BaseModel):

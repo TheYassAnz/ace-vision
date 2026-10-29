@@ -85,10 +85,17 @@ struct StrokesTable: View {
                 TableColumn("Temps") { Text(clock($0.stroke.t)).monospacedDigit() }
                 TableColumn("Type") { Text($0.stroke.kind.label) }
                 TableColumn("Défauts") { Text($0.stroke.defects.map(\.label).joined(separator: ", ")) }
+                TableColumn("Vitesse bras") { Text(relativeSpeed($0.stroke)).monospacedDigit() }
             }
             .frame(height: 320)
             .onChange(of: selection) { if let i = selection, strokes.indices.contains(i) { onClip(strokes[i].t) } }  // selecting a row (click or arrows) plays it
         }
+    }
+
+    /// Share of the match's fastest arm: the raw value is a 2D image-plane speed, not a real-world one.
+    private func relativeSpeed(_ s: Stroke) -> String {
+        guard let v = s.wristSpeed, let top = strokes.compactMap(\.wristSpeed).max(), top > 0 else { return "—" }
+        return "\(Int((v / top * 100).rounded())) %"
     }
 
     struct Row: Identifiable { let id: Int; let stroke: Stroke }
