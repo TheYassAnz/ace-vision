@@ -96,9 +96,9 @@ Score sur IMG_2665 (vue filet, droitier, revers à deux mains, 8 coups notés) :
 | | Trouvés | Bien classés | Fausses frappes |
 |---|---|---|---|
 | Avant | 8/8 (100 %) | 1/8 (12 %) | 1 |
-| Après | 8/8 (100 %) | 7/8 (88 %) | 0 |
+| Après | 8/8 (100 %) | 8/8 (100 %) | 0 |
 
-Le revers de 16,4 s (fin bras au-dessus de la tête, sans lancer) est classé `other`.
+Les huit coups sont trouvés et bien classés, à moins de 0,3 s de la note.
 
 ## Tests
 
