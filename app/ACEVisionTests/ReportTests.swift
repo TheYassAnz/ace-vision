@@ -45,3 +45,13 @@ func stroke(_ k: StrokeKind) -> Stroke { Stroke(t: 1, frame: 30, kind: k, defect
 }
 
 @Test func clockHasNoPaddedMinutes() { #expect(clock(192) == "3:12") }
+
+@Test func clockTruncatesFractionalSeconds() {
+    #expect(clock(59.6) == "0:59" && clock(192.9) == "3:12" && clock(3723.5) == "1:02:03")
+}
+
+@Test func createdIsReadInLocalZone() throws {
+    let zone = try #require(TimeZone(secondsFromGMT: 2 * 3600))
+    let d = try #require(parseCreated("2026-03-04T23:30:00", in: zone))
+    #expect(d.formatted(Date.FormatStyle(locale: frFR, timeZone: zone).day().month(.wide)) == "4 mars")
+}

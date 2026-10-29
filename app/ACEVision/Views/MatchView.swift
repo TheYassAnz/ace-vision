@@ -5,6 +5,7 @@ struct MatchView: View {
     let library: Library
     @State private var match: Match?
     @State private var loadError: String?
+    @State private var relaunchMessage: String?
 
     var body: some View {
         Group {
@@ -29,7 +30,8 @@ struct MatchView: View {
         case .failed, .pending:
             VStack(spacing: 12) {
                 Text(s.status == .failed ? (s.error ?? "L'analyse a échoué. Relance-la ; si ça échoue encore, regarde engine.log.") : "Ce match n'a pas encore été analysé.")
-                Button("Relancer l'analyse") { Task { _ = try? await api.relaunch(s.id); await library.refresh() } }
+                Button("Relancer l'analyse") { Task { await relaunch(s.id) } }
+                if let m = relaunchMessage { Text(m).foregroundStyle(.secondary) }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .done:
@@ -63,5 +65,15 @@ struct MatchView: View {
         guard library.matches.first(where: { $0.id == id })?.status == .done else { return }
         do { match = try await api.match(id); loadError = nil }
         catch { loadError = error.localizedDescription }
+    }
+
+    private func relaunch(_ id: String) async {
+        do {
+            let started = try await api.relaunch(id)
+            relaunchMessage = started ? nil : "Une analyse est déjà en cours. Celle-ci démarrera quand tu cliqueras sur Relancer l'analyse."
+        } catch {
+            relaunchMessage = error.localizedDescription
+        }
+        await library.refresh()
     }
 }

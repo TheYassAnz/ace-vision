@@ -22,6 +22,12 @@ struct LibraryView: View {
                 List(library.matches, selection: $library.selection) { m in
                     row(m).tag(m.id)
                 }
+                .safeAreaInset(edge: .bottom) {
+                    if let e = library.error {
+                        Label(e, systemImage: "exclamationmark.triangle").font(.caption).padding(8)
+                            .frame(maxWidth: .infinity, alignment: .leading).background(.bar)
+                    }
+                }
             }
         } detail: {
             MatchView(api: api, library: library)
@@ -38,8 +44,8 @@ struct LibraryView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(m.title.isEmpty ? m.id : m.title).lineLimit(1).truncationMode(.middle).help(m.title)
             HStack {
-                if let d = m.created.flatMap(Self.parse) {
-                    Text(d.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(frFR)))
+                if let d = m.created.flatMap({ parseCreated($0) }) {
+                    Text(dayText(d))
                 }
                 Text(m.view.label)
             }.font(.caption).foregroundStyle(.secondary)
@@ -53,6 +59,4 @@ struct LibraryView: View {
         .accessibilityElement(children: .combine)
     }
 
-    // created is a local ISO time without zone ("2026-03-04T10:00:00")
-    private static let parse: (String) -> Date? = { try? Date($0, strategy: .iso8601.year().month().day().dateTimeSeparator(.standard).time(includingFractionalSeconds: false)) }
 }

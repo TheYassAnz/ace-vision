@@ -43,7 +43,18 @@ extension Double {
     var percentText: String { formatted(.percent.precision(.fractionLength(0)).locale(frFR)) }
 }
 
-/// "3:12" for a time in seconds.
+/// "3:12" (or "1:02:03" from one hour) for a time in seconds; fractional seconds are truncated.
 func clock(_ t: Double) -> String {
-    Duration.seconds(t).formatted(.time(pattern: .minuteSecond(padMinuteToLength: 1)).locale(frFR))
+    let d = Duration.seconds(max(0, t).rounded(.down))
+    return t >= 3600 ? d.formatted(.time(pattern: .hourMinuteSecond(padHourToLength: 1)).locale(frFR))
+                     : d.formatted(.time(pattern: .minuteSecond(padMinuteToLength: 1)).locale(frFR))
+}
+
+/// `created` is a zone-less local time ("2026-03-04T10:00:00"): read it in `zone`, not GMT.
+func parseCreated(_ s: String, in zone: TimeZone = .current) -> Date? {
+    try? Date(s, strategy: Date.ISO8601FormatStyle(timeZone: zone).year().month().day().dateTimeSeparator(.standard).time(includingFractionalSeconds: false))
+}
+
+func dayText(_ d: Date, in zone: TimeZone = .current) -> String {
+    d.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, locale: frFR, timeZone: zone))
 }

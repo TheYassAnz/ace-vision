@@ -20,7 +20,7 @@ struct OverviewSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Vue d'ensemble").font(.title2.bold())
-            HStack(alignment: .top) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), alignment: .top)], alignment: .leading, spacing: 12) {
                 ForEach([StrokeKind.forehand, .backhand, .serve, .other], id: \.self) { k in
                     StatCard(value: report.count(k).formatted(.number.locale(frFR)), caption: k.plural.prefix(1).uppercased() + k.plural.dropFirst())
                 }
