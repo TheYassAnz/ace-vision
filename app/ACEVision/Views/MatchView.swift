@@ -51,7 +51,14 @@ struct MatchView: View {
                         VStack(alignment: .leading, spacing: 24) {
                             let r = Report(m)
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(m.title.isEmpty ? m.id : m.title).font(.largeTitle.bold()).lineLimit(1).truncationMode(.middle).help(m.title)
+                                HStack {
+                                    Text(m.title.isEmpty ? m.id : m.title).font(.largeTitle.bold()).lineLimit(1).truncationMode(.middle).help(m.title)
+                                    Spacer()
+                                    Button("Relancer l'analyse") { Task { await relaunch(m.id) } }
+                                        .disabled(notes.hasUnsaved)
+                                        .help(notes.hasUnsaved ? "Enregistre ou abandonne tes notes avant de relancer l'analyse." : "")
+                                }
+                                if let msg = relaunchMessage { Text(msg).foregroundStyle(.secondary) }
                                 Text(m.view.label).foregroundStyle(.secondary)
                                 if let n = r.coverageNotice { Label(n, systemImage: "exclamationmark.triangle") }
                                 if let n = r.reliability { Text(n).monospacedDigit() }

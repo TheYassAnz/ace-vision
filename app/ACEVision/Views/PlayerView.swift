@@ -75,12 +75,12 @@ struct PlayerView: View {
         guard pose == nil || loadedFor != match.id else { return }
         pose = nil
         poseLoading = true
-        defer { poseLoading = false }
+        defer { if !Task.isCancelled { poseLoading = false } }
         do {
             let p = try await api.pose(match.id)
             pose = p
             loadedFor = match.id
-        } catch { poseError = error.localizedDescription }
+        } catch { if !Task.isCancelled { poseError = error.localizedDescription } }
     }
 
     private func removeKeys() {
