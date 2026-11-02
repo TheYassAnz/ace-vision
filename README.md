@@ -113,7 +113,9 @@ Mesuré sur deux vidéos vue arrière (2026-10-29) :
 | echange-3 | 6/10 | 36 ms | 0/6 | pas de notes |
 | img-7687 | 10/20 | 43 ms | 1/10 | trouvés 11/14, bien classés 100 %, 9 fausses frappes → identique |
 
-Les frappes restées sur le poignet sont surtout des fausses frappes (joueur qui marche ou se prépare). Les constantes n'ont pas été changées : sur img-7687, deux vraies frappes (5,1 s et 58,3 s, balle dans le cordage à l'image) ont leur claquement à 0,19-0,23 s du pic du poignet, hors fenêtre, mais élargir `SOUND_SEARCH_S` à 0,25 s calerait aussi quatre fausses frappes des deux vidéos sur un autre bruit (balle de l'adversaire, balle qu'on fait rebondir).
+Les frappes restées sur le poignet sont surtout des fausses frappes (joueur qui marche ou se prépare), mais pas seulement : sur img-7687, deux vraies frappes (5,12 s et 58,26 s, balle dans le cordage à l'image) ont leur claquement à 0,19-0,23 s du pic du poignet, hors fenêtre. La vignette « son » fausse (39,39 s) est une fausse frappe du détecteur de pose qui tombe par hasard près d'un claquement.
+
+Les constantes n'ont pas été changées : élargir `SOUND_SEARCH_S` à 0,25 s calerait ces deux vraies frappes (et 41,74 s, joueur hors champ), mais aussi quatre fausses frappes sur un autre bruit : trois sur img-7687 (21,02 s joueur arrêté, 37,64 s joueur qui court, 45,05 s balle qu'il fait rebondir sur la raquette) et une sur echange-3 (24,02 s balle qu'il lance pour servir l'échange).
 
 Limite connue : une vidéo sans son, ou très bruitée, garde l'instant du poignet.
 
