@@ -21,7 +21,7 @@ def _clicks_at(times, dur=4.0, seed=0):
 
 def test_finds_each_click_to_the_millisecond():
     got = impact_clicks(_clicks_at([0.5, 1.7, 3.1]), SR)
-    assert len(got) == 3 and np.allclose(got, [0.5, 1.7, 3.1], atol=0.006)
+    assert len(got) == 3 and np.allclose(got, [0.5, 1.7, 3.1], atol=0.003)
 
 
 def test_silence_has_no_click():

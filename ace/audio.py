@@ -25,15 +25,23 @@ def read_audio(path: Path) -> np.ndarray | None:
     raw = subprocess.run(
         ["ffmpeg", "-v", "error", "-i", str(path), "-vn", "-ac", "1", "-ar", str(SAMPLE_RATE),
          "-f", "s16le", "-"], capture_output=True, check=True).stdout
-    return np.frombuffer(raw, np.int16).astype(np.float32) / 32768
+    samples = np.frombuffer(raw, np.int16).astype(np.float32)
+    samples /= 32768  # in place: no second float32 copy
+    return samples
 
 
 def impact_clicks(samples: np.ndarray, sr: int = SAMPLE_RATE) -> np.ndarray:
     """Times (s, sorted) of sharp broadband attacks: the ball-racket crack."""
-    a = sosfilt(butter(4, HIGHPASS_HZ, "highpass", fs=sr, output="sos"), samples)
+    sos = butter(4, HIGHPASS_HZ, "highpass", fs=sr, output="sos").astype(np.float32)
+    a = sosfilt(sos, samples.astype(np.float32, copy=False))  # float32 end to end, no float64 copy of the track
+    np.square(a, out=a)
     hop = sr // 1000  # envelope sampled every 1 ms
-    win = hop * ENV_MS
-    env = np.sqrt(np.convolve(a ** 2, np.ones(win) / win, mode="same"))[::hop]
+    # Moving mean over ENV_MS centred on each 1 ms point = sum of 3 consecutive hop-wide blocks
+    # (offset by hop/2). Block sums accumulate in float64, so a 33 min track stays exact.
+    starts = np.concatenate([[0], np.arange(hop // 2, len(a), hop)])
+    blocks = np.add.reduceat(a, starts, dtype=np.float64)[:-(-len(a) // hop)]
+    padded = np.concatenate([[0.0], blocks, [0.0]])
+    env = np.sqrt((padded[:-2] + padded[1:-1] + padded[2:]) / (hop * ENV_MS))
     db = 20 * np.log10(env + 1e-6)
     rise = np.concatenate([np.zeros(RISE_MS), np.maximum(0, db[RISE_MS:] - db[:-RISE_MS])])
     peaks, _ = find_peaks(rise, height=MIN_RISE_DB, distance=MIN_CLICK_GAP_S * 1000)
