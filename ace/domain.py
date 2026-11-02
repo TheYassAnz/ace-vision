@@ -41,6 +41,7 @@ class Stroke(BaseModel):
     defects: list[DefectId] = Field(default_factory=list)
     outcome: Outcome = "unknown"
     wrist_speed: float | None = None  # torso lengths / s at impact; None on matches analysed before it existed
+    sound_hit: bool | None = None  # impact timed on the racket click; None when analysed without sound
 
 
 class Rally(BaseModel):

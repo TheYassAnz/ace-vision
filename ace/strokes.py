@@ -80,12 +80,24 @@ def classify_stroke(kp: np.ndarray, frame: int, fps: float, settings: Settings, 
         return "other"
     return "forehand" if (side > 0) == (settings.handedness == "right") else "backhand"
 
-def detect_strokes(kp: np.ndarray, fps: float, settings: Settings) -> list[Stroke]:
+SOUND_SEARCH_S = 0.1  # a click this close to the wrist peak is this stroke's impact
+
+
+def sound_impact(clicks: np.ndarray, t: float) -> float | None:
+    """Click closest to t within SOUND_SEARCH_S (earliest on a tie), else None."""
+    near = clicks[np.abs(clicks - t) <= SOUND_SEARCH_S + 1e-9]  # epsilon: 1.3 - 1.2 rounds above 0.1
+    return float(near[np.argmin(np.abs(near - t))]) if len(near) else None
+
+
+def detect_strokes(kp: np.ndarray, fps: float, settings: Settings, clicks: np.ndarray | None = None) -> list[Stroke]:
     strokes, prev = [], None
     right_dir = body_right_dir(kp)
     speed = wrist_speed(kp, fps, settings)
-    for f in detect_hits(kp, fps, settings):
-        strokes.append(Stroke(t=f / fps, frame=f, kind=classify_stroke(kp, f, fps, settings, prev, right_dir),
-                              wrist_speed=float(speed[f])))
-        prev = f
+    for p in detect_hits(kp, fps, settings):
+        # kind and speed stay measured at the peak, where their thresholds were calibrated
+        c = sound_impact(clicks, p / fps) if clicks is not None else None
+        f = int(np.clip(round(c * fps), 0, len(kp) - 1)) if c is not None else p
+        strokes.append(Stroke(t=f / fps, frame=f, kind=classify_stroke(kp, p, fps, settings, prev, right_dir),
+                              wrist_speed=float(speed[p]), sound_hit=None if clicks is None else c is not None))
+        prev = p
     return strokes

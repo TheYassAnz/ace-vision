@@ -28,7 +28,8 @@
         "late_prep"
       ],
       "outcome": "unknown",
-      "wrist_speed": null
+      "wrist_speed": null,
+      "sound_hit": null
     },
     {
       "t": 6.2,
@@ -36,7 +37,8 @@
       "kind": "backhand",
       "defects": [],
       "outcome": "in",
-      "wrist_speed": 8.5
+      "wrist_speed": 8.5,
+      "sound_hit": true
     }
   ],
   "rallies": null,
