@@ -100,6 +100,23 @@ Score sur IMG_2665 (vue filet, droitier, revers à deux mains, 8 coups notés) :
 
 Les huit coups sont trouvés et bien classés, à moins de 0,3 s de la note.
 
+## Calage par le son
+
+Le pic de vitesse du poignet arrive un peu avant ou après l'impact. Chaque frappe est donc recalée sur le claquement balle-cordage le plus proche dans la bande son (montée d'au moins `MIN_RISE_DB` = 12 dB au-dessus de 2 kHz, à `SOUND_SEARCH_S` = 0,1 s au plus du pic du poignet) ; le son ne crée ni ne supprime de frappe.
+
+Pour vérifier à l'image : `uv run python scripts/impact_frames.py <id du match>` écrit `impacts.jpg` dans le dossier du match, une vignette par frappe marquée « son » ou « poignet ». `calibrate.py` affiche aussi le score sans et avec son, la part de frappes calées et le décalage moyen son-poignet.
+
+Mesuré sur deux vidéos vue arrière (2026-10-29) :
+
+| Vidéo | Calées sur le son | Décalage moyen | Vignettes « son » fausses | Score sur les notes (sans son → avec son) |
+|---|---|---|---|---|
+| echange-3 | 6/10 | 36 ms | 0/6 | pas de notes |
+| img-7687 | 10/20 | 43 ms | 1/10 | trouvés 11/14, bien classés 100 %, 9 fausses frappes → identique |
+
+Les frappes restées sur le poignet sont surtout des fausses frappes (joueur qui marche ou se prépare). Les constantes n'ont pas été changées : sur img-7687, deux vraies frappes (5,1 s et 58,3 s, balle dans le cordage à l'image) ont leur claquement à 0,19-0,23 s du pic du poignet, hors fenêtre, mais élargir `SOUND_SEARCH_S` à 0,25 s calerait aussi quatre fausses frappes des deux vidéos sur un autre bruit (balle de l'adversaire, balle qu'on fait rebondir).
+
+Limite connue : une vidéo sans son, ou très bruitée, garde l'instant du poignet.
+
 ## Tests
 
 ```
