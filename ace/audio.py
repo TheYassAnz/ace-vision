@@ -1,9 +1,11 @@
+import logging
 import subprocess
 from pathlib import Path
 
 import numpy as np
 from scipy.signal import butter, find_peaks, sosfilt
 
+log = logging.getLogger(__name__)
 SAMPLE_RATE = 48000
 
 HIGHPASS_HZ = 2000      # the racket crack is broadband; footsteps, bounces and voices sit lower
@@ -36,3 +38,13 @@ def impact_clicks(samples: np.ndarray, sr: int = SAMPLE_RATE) -> np.ndarray:
     rise = np.concatenate([np.zeros(RISE_MS), np.maximum(0, db[RISE_MS:] - db[:-RISE_MS])])
     peaks, _ = find_peaks(rise, height=MIN_RISE_DB, distance=MIN_CLICK_GAP_S * 1000)
     return peaks / 1000.0
+
+
+def match_clicks(video: Path, match_id: str) -> np.ndarray | None:
+    """Impact clicks of a match video; None when it has no sound or the sound is unreadable."""
+    try:
+        samples = read_audio(video)
+        return impact_clicks(samples) if samples is not None else None
+    except Exception:
+        log.warning("sound of %s unreadable, strokes stay on the wrist peak", match_id, exc_info=True)
+        return None

@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from ace import jobs, pipeline, store
+from ace import audio, jobs, pipeline, store
 from ace.domain import VideoInfo
 from ace.geometry import L_ANK, L_HIP, L_SH, R_ANK, R_HIP, R_SH
 from ace.jobs import JobRunner
@@ -21,6 +21,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("ACE_DATA_DIR", str(tmp_path))
     monkeypatch.setattr(store, "probe", lambda p: INFO)
     monkeypatch.setattr(pipeline, "probe", lambda p: INFO)
+    monkeypatch.setattr(audio, "read_audio", lambda p: None)  # the fake video has no ffmpeg-readable sound
 
 
 @pytest.fixture
@@ -43,6 +44,35 @@ def test_analyse_net_view_done(match, monkeypatch):
     assert (m.status, m.progress, m.error) == ("done", 1.0, None)
     assert len(m.strokes) == 6 and m.rallies is None
     assert store.pose_path(m.id).exists()
+
+
+def test_strokes_timed_on_clicks(match, monkeypatch):
+    monkeypatch.setattr(pipeline, "extract_pose", _fake_pose)
+    peaks = [f / INFO.fps for f in range(60, 660, 100)]  # add_swing peaks in _fake_pose
+    monkeypatch.setattr(audio, "read_audio", lambda p: np.zeros(10, np.float32))
+    monkeypatch.setattr(audio, "impact_clicks", lambda a: np.array([t + 0.05 for t in peaks]))
+    pipeline.analyse(match.id)
+    m = store.load(match.id)
+    assert m.status == "done" and all(s.sound_hit for s in m.strokes)
+
+
+def test_no_audio_track_analyses_as_before(match, monkeypatch):
+    monkeypatch.setattr(pipeline, "extract_pose", _fake_pose)
+    pipeline.analyse(match.id)  # env fixture: read_audio returns None
+    m = store.load(match.id)
+    assert m.status == "done" and len(m.strokes) == 6 and all(s.sound_hit is None for s in m.strokes)
+
+
+def test_unreadable_audio_still_done(match, monkeypatch, caplog):
+    def bad(p):
+        raise subprocess.CalledProcessError(1, ["ffmpeg"])
+
+    monkeypatch.setattr(pipeline, "extract_pose", _fake_pose)
+    monkeypatch.setattr(audio, "read_audio", bad)
+    pipeline.analyse(match.id)
+    m = store.load(match.id)
+    assert (m.status, m.error) == ("done", None) and all(s.sound_hit is None for s in m.strokes)
+    assert "sound" in caplog.text
 
 
 def test_analyse_failure_marks_failed(match, monkeypatch):
