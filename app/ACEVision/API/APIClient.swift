@@ -60,6 +60,11 @@ final class APIClient: Sendable {
 
     func stop(_ id: String) async throws { _ = try await send("POST", "/matchs/\(id)/arreter") }
     func delete(_ id: String) async throws { _ = try await send("DELETE", "/matchs/\(id)") }
+
+    func rename(_ id: String, title: String) async throws {
+        struct Body: Encodable, Sendable { let title: String }
+        _ = try await send("PATCH", "/matchs/\(id)", body: Body(title: title))
+    }
     func notes(_ id: String) async throws -> [Note] { try await get("/matchs/\(id)/notes") }
 
     func saveNotes(_ id: String, _ notes: [Note]) async throws -> Score {

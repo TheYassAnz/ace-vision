@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -38,6 +38,10 @@ class ImportBody(BaseModel):
     path: str
     view: View
     title: str = ""
+
+
+class RenameBody(BaseModel):
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 
 
 def get_match(id: str) -> Match:
@@ -93,6 +97,16 @@ def match_detail(id: str):
         m.error = "Analyse interrompue."
     m.status = status
     return m.model_dump(mode="json", exclude={"strokes": {"__all__": {"metrics"}}})
+
+
+@app.patch("/matchs/{id}")
+def rename(id: str, body: RenameBody):
+    m = get_match(id)
+    if runner.running_id == id or m.status == "running":  # the pipeline saves its own copy and would undo the rename
+        return JSONResponse({"detail": "Ce match est en cours d'analyse."}, status_code=409)
+    m.title = body.title
+    store.save(m)
+    return summary(m)
 
 
 @app.post("/matchs/{id}/relancer")

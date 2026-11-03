@@ -14,6 +14,12 @@ private func s(_ id: String, _ status: MatchStatus) -> MatchSummary {
     #expect(Library.finished(old: [s("a", .pending)], new: [s("a", .done)]).isEmpty)
 }
 
+@Test func newTitleSkipsBlankAndUnchanged() {
+    #expect(Library.newTitle("  Finale ", old: "a") == "Finale")
+    #expect(Library.newTitle("   ", old: "a") == nil)
+    #expect(Library.newTitle("a ", old: "a") == nil)
+}
+
 private struct Stub: MatchListing { let result: [MatchSummary]; func matches() async throws -> [MatchSummary] { result } }
 
 @MainActor @Test func refreshNotifiesOnFinish() async {
