@@ -7,6 +7,7 @@ from collections.abc import Callable
 import numpy as np
 
 from ace import store
+from ace.audio import match_clicks
 from ace.findings import build_findings, load_advice
 from ace.geometry import L_HIP, R_HIP
 from ace.notes import score_detection
@@ -52,7 +53,8 @@ def analyse(match_id: str, should_stop: Callable[[], bool] = lambda: False) -> N
             raise Cancelled
         np.savez_compressed(store.pose_path(match_id), kp=kp)
         m.coverage = float(np.isfinite(kp[:, [L_HIP, R_HIP], :2]).all(axis=(1, 2)).mean()) if len(kp) else 0.0
-        m.strokes = detect_strokes(kp, info.fps, m.settings)
+        m.strokes = detect_strokes(kp, info.fps, m.settings,
+                                  clicks=match_clicks(store.match_dir(match_id) / m.video_file, match_id))
         ref = ref_shoulder_width(kp)
         if math.isfinite(ref) and ref > 0:
             for s in m.strokes:

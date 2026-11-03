@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from ace.domain import Settings
-from ace.strokes import HIT_MIN_SPEED, body_right_dir, classify_stroke, detect_hits, detect_strokes
+from ace.strokes import HIT_MIN_SPEED, body_right_dir, classify_stroke, detect_hits, detect_strokes, sound_impact
 from ace.geometry import L_HIP, L_WR, NOSE, R_HIP, R_WR
 from tests.synthetic import NOSE_Y, SH_Y, add_swing, make_pose
 
@@ -172,3 +172,48 @@ def test_detect_strokes():
     strokes = detect_strokes(kp, FPS, Settings(backhand_hands=1))
     assert [(s.kind, s.metrics, s.defects) for s in strokes] == [("forehand", {}, []), ("backhand", {}, [])]
     assert abs(strokes[0].frame - 100) <= 2 and strokes[0].t == pytest.approx(strokes[0].frame / FPS)
+
+
+def test_sound_impact_picks_closest_then_earliest():
+    clicks = np.array([0.95, 1.05, 1.3])
+    assert sound_impact(clicks, 1.0) == 0.95          # tie at 50 ms: earlier wins
+    assert sound_impact(clicks, 1.04) == 1.05
+    assert sound_impact(clicks, 1.2) == 1.3           # bound included: abs(c - t) <= SOUND_SEARCH_S
+    assert sound_impact(clicks, 1.5) is None
+    assert sound_impact(np.array([]), 1.0) is None
+
+
+def test_strokes_move_to_the_click():
+    kp = make_pose(300); add_swing(kp, 150)
+    peak = detect_strokes(kp, FPS, RIGHT)[0]
+    s = detect_strokes(kp, FPS, RIGHT, clicks=np.array([peak.t + 0.05]))[0]
+    assert s.frame == peak.frame + round(0.05 * FPS) and s.t == s.frame / FPS
+    assert s.sound_hit is True and s.kind == peak.kind and s.wrist_speed == peak.wrist_speed
+
+
+def test_strokes_at_5994_fps_frame_and_t_agree():
+    kp = make_pose(600); add_swing(kp, 300)
+    fps = 59.94
+    peak = detect_strokes(kp, fps, RIGHT)[0]
+    s = detect_strokes(kp, fps, RIGHT, clicks=np.array([peak.t - 0.04]))[0]
+    assert s.frame == round((peak.t - 0.04) * fps) and s.t == s.frame / fps
+
+
+def test_no_click_in_window_keeps_the_peak():
+    kp = make_pose(300); add_swing(kp, 150)
+    peak = detect_strokes(kp, FPS, RIGHT)[0]
+    s = detect_strokes(kp, FPS, RIGHT, clicks=np.array([peak.t + 1.5]))[0]  # opponent's hit
+    assert (s.frame, s.sound_hit) == (peak.frame, False)
+
+
+def test_without_sound_sound_hit_is_none():
+    kp = make_pose(300); add_swing(kp, 150)
+    assert detect_strokes(kp, FPS, RIGHT)[0].sound_hit is None
+
+
+def test_click_after_last_frame_is_clamped():
+    kp = make_pose(300); add_swing(kp, 150)
+    peak = detect_strokes(kp, FPS, RIGHT)[0]
+    short = kp[: peak.frame + 2]  # the video ends one frame after the peak
+    s = detect_strokes(short, FPS, RIGHT, clicks=np.array([peak.t + 0.09]))
+    assert s[0].frame == len(short) - 1 and s[0].sound_hit is True

@@ -10,6 +10,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # run as a plain script from anywhere
 
 from ace import store
+from ace.audio import match_clicks
 from ace.notes import NOTE_MERGE_S, match_notes, merge_notes, score_detection
 from ace.strokes import detect_strokes
 
@@ -20,7 +21,9 @@ def main(match_id: str) -> None:
     settings = store.load_settings()
     raw = store.load_notes(match_id) or []
     notes = merge_notes(raw)
-    strokes = detect_strokes(kp, m.info.fps, settings)
+    clicks = match_clicks(store.match_dir(match_id) / m.video_file, match_id)
+    wrist = detect_strokes(kp, m.info.fps, settings)
+    strokes = detect_strokes(kp, m.info.fps, settings, clicks=clicks) if clicks is not None else wrist
     print(f"match {match_id} — {settings.handedness}, revers à {settings.backhand_hands} main(s), {m.info.fps:g} i/s")
     if len(notes) < len(raw):
         print(f"{len(raw) - len(notes)} note(s) fusionnée(s) (moins de {NOTE_MERGE_S} s d'écart) : {len(raw)} -> {len(notes)}")
@@ -37,9 +40,20 @@ def main(match_id: str) -> None:
     for j, s in enumerate(strokes):
         if j not in used:
             print(f"{'':>7} {'':<9} {s.t:8.2f} {s.kind:<9} {'':>6}  fausse frappe")
-    sc = score_detection(strokes, raw)
-    print(f"Score : trouvés {sc.n_detected}/{sc.n_notes} ({sc.found_rate:.0%}), bien classés {sc.class_rate:.0%}, "
-          f"fausses frappes {sc.false_hits}")
+    def score_line(strokes_: list) -> str:
+        sc = score_detection(strokes_, raw)
+        return (f"Score : trouvés {sc.n_detected}/{sc.n_notes} ({sc.found_rate:.0%}), bien classés {sc.class_rate:.0%}, "
+                f"fausses frappes {sc.false_hits}")
+
+    if clicks is None:
+        print(score_line(strokes))
+        return
+    print("sans son :", score_line(wrist))
+    print("avec son :", score_line(strokes))
+    hits = [(s.t - w.t) for s, w in zip(strokes, wrist) if s.sound_hit]
+    print(f"calées sur le son : {len(hits)}/{len(strokes)}")
+    if hits:
+        print(f"décalage moyen : {1000 * np.mean(np.abs(hits)):.0f} ms")
 
 
 if __name__ == "__main__":
