@@ -177,6 +177,28 @@ def test_delete_stuck_running_on_disk_is_409():
     assert client.delete(f"/matchs/{m.id}").status_code == 409 and store.match_dir(m.id).exists()
 
 
+def test_rename_match():
+    m = make()
+    r = client.patch(f"/matchs/{m.id}", json={"title": "  Finale  "})
+    assert r.status_code == 200 and r.json()["title"] == "Finale" and store.load(m.id).title == "Finale"
+
+
+def test_rename_to_blank_is_422():
+    m = make()
+    assert client.patch(f"/matchs/{m.id}", json={"title": "   "}).status_code == 422 and store.load(m.id).title == "vs Karim"
+
+
+def test_rename_running_is_409(monkeypatch):
+    m = make()
+    monkeypatch.setattr(runner, "running_id", m.id)
+    r = client.patch(f"/matchs/{m.id}", json={"title": "Finale"})
+    assert r.status_code == 409 and store.load(m.id).title == "vs Karim"
+
+
+def test_rename_unknown_is_404():
+    assert client.patch("/matchs/absent", json={"title": "Finale"}).status_code == 404
+
+
 def test_match_json_is_strict():
     m = make()
     m.status = "done"

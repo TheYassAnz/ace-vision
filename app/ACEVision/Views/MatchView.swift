@@ -23,7 +23,7 @@ struct MatchView: View {
             }
         }
         .onChange(of: notes.revision) { Task { await library.refresh() } }
-        .navigationTitle(library.selection == Library.progressionId ? "Progression" : library.selection.flatMap { id in library.matches.first { $0.id == id }?.title } ?? "ACE Vision")
+        .modifier(MatchTitle(library: library, api: api))
     }
 
     @ViewBuilder private func content(_ s: MatchSummary) -> some View {
@@ -116,5 +116,20 @@ struct MatchView: View {
             relaunchMessage = error.localizedDescription
         }
         await library.refresh()
+    }
+}
+
+/// An editable window title for a match (macOS offers Rename on it), a plain one otherwise.
+private struct MatchTitle: ViewModifier {
+    let library: Library
+    let api: APIClient
+
+    func body(content: Content) -> some View {
+        if let id = library.selection, let s = library.matches.first(where: { $0.id == id }) {
+            content.navigationTitle(Binding(get: { s.title.isEmpty ? s.id : s.title },
+                                            set: { t in Task { await library.rename(id, to: t, api: api) } }))
+        } else {
+            content.navigationTitle(library.selection == Library.progressionId ? "Progression" : "ACE Vision")
+        }
     }
 }

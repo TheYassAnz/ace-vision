@@ -15,6 +15,9 @@ struct LibraryView: View {
     @State private var photoItem: PhotosPickerItem?
     @State private var deleteTarget: String?
     @State private var deleteError: String?
+    @State private var renaming: String?
+    @State private var renameText = ""
+    @FocusState private var renameFocused: Bool
     @SceneStorage("selection") private var stored: String?
 
     init(api: APIClient, library: Library, notes: NotesSession, inbox: Inbox, dataDir: URL?) {
@@ -41,7 +44,11 @@ struct LibraryView: View {
                 List(selection: Binding(get: { library.selection }, set: { select($0) })) {
                     ForEach(library.matches) { m in
                         row(m).tag(m.id)
-                            .contextMenu { Button("Supprimer le match…", role: .destructive) { deleteTarget = m.id } }
+                            .contextMenu {
+                                Button("Renommer…") { renameText = m.title; renaming = m.id }
+                                    .disabled(m.status == .running)
+                                Button("Supprimer le match…", role: .destructive) { deleteTarget = m.id }
+                            }
                     }
                     Label("Progression", systemImage: "chart.line.uptrend.xyaxis").tag(Library.progressionId)
                 }
@@ -105,6 +112,9 @@ struct LibraryView: View {
             Button("Supprimer le match", role: .destructive) { if let id = deleteTarget { Task { await delete(id) } } }
             Button("Annuler", role: .cancel) {}
         } message: { Text("La copie de la vidéo et l'analyse seront effacées. La vidéo d'origine n'est pas touchée.") }
+        .alert("Renommage impossible", isPresented: Binding(get: { library.renameError != nil }, set: { if !$0 { library.renameError = nil } })) {
+            Button("Fermer") {}
+        } message: { Text(library.renameError ?? "") }
         .alert("Suppression impossible", isPresented: Binding(get: { deleteError != nil }, set: { if !$0 { deleteError = nil } })) {
             Button("Fermer") {}
         } message: { Text(deleteError ?? "") }
@@ -144,7 +154,16 @@ struct LibraryView: View {
 
     private func row(_ m: MatchSummary) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(m.title.isEmpty ? m.id : m.title).lineLimit(1).truncationMode(.middle).help(m.title)
+            if renaming == m.id {
+                TextField("Titre du match", text: $renameText)
+                    .focused($renameFocused)
+                    .onAppear { renameFocused = true }  // the field only exists from now on
+                    .onSubmit { let t = renameText; renaming = nil; Task { await library.rename(m.id, to: t, api: api) } }
+                    .onExitCommand { renaming = nil }
+                    .onChange(of: renameFocused) { if !renameFocused { renaming = nil } }  // clicking away cancels, like Escape
+            } else {
+                Text(m.title.isEmpty ? m.id : m.title).lineLimit(1).truncationMode(.middle).help(m.title)
+            }
             HStack {
                 if let d = m.created.flatMap({ parseCreated($0) }) {
                     Text(dayText(d))
