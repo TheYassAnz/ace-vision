@@ -2,6 +2,8 @@
 
 Application locale pour Mac qui analyse des vidéos de tennis filmées à l'iPhone. Elle repère chaque coup (coup droit, revers, service), calcule un bilan du match et signale les défauts de technique les plus fréquents avec des conseils. Tout tourne sur votre Mac : rien n'est envoyé sur Internet.
 
+![Page d'un match : la vidéo avec le squelette, la vue d'ensemble des coups et la liste de tous les coups](docs/images/match-view.webp)
+
 ## Installation
 
 1. Téléchargez `ACE-Vision-<version>.zip` depuis la dernière [release](../../releases), ouvrez-le d'un double-clic dans le Finder (ou `ditto -x -k ACE-Vision-<version>.zip .` dans le Terminal ; pas `unzip`, qui casse la signature) et glissez **ACE Vision** dans Applications.
