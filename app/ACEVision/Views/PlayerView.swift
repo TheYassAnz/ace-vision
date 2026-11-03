@@ -20,7 +20,7 @@ struct PlayerView: View {
             PlayerSurface(player: model.player, pose: showSkeleton ? pose : nil,
                           videoSize: CGSize(width: match.info?.width ?? 0, height: match.info?.height ?? 0), fps: match.info?.fps ?? 0)
                 .frame(maxWidth: .infinity)
-                .containerRelativeFrame(.vertical) { h, _ in max(260, h * 0.55) }
+                .containerRelativeFrame(.vertical) { h, _ in max(220, h * 0.4) }
             if match.strokes.isEmpty {
                 Text("Aucun coup détecté sur ce match.").foregroundStyle(.secondary)
             } else {
@@ -52,12 +52,10 @@ struct PlayerView: View {
                 Button("Enregistrer les notes") { Task { await notes.save(api) } }.disabled(notes.saving || !notes.recorder.hasUnsaved || notes.recorder.notes.isEmpty)
                 Text(notes.recorder.countLabel).monospacedDigit()
             }
+            Button(showSkeleton ? "Masquer le squelette" : "Afficher le squelette") { showSkeleton.toggle() }
             if let e = notes.loadError { Text(e).foregroundStyle(.red) }
             if notes.saving { ProgressView().controlSize(.small); Text("Enregistrement…") }
             else if let m = notes.message { Text(m).foregroundStyle(.secondary).monospacedDigit() }
-        }
-        HStack {
-            Button(showSkeleton ? "Masquer le squelette" : "Afficher le squelette") { showSkeleton.toggle() }
             if poseLoading { ProgressView().controlSize(.small); Text("Chargement du squelette…") }
             if let e = poseError { Text(e).foregroundStyle(.red) }
         }
