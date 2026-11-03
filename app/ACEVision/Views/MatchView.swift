@@ -48,31 +48,34 @@ struct MatchView: View {
             if let m = match, m.id == s.id {
                 VStack(spacing: 0) {
                     if let player {
-                        PlayerView(match: m, model: player, notes: notes, api: api).padding([.horizontal, .top], 24).padding(.bottom, 12)
+                        HStack(alignment: .top, spacing: 16) {
+                            PlayerView(match: m, model: player, notes: notes, api: api) { Task { await relaunch(m.id) } }
+                                .containerRelativeFrame(.horizontal) { w, _ in w * 0.6 }
+                            OverviewSection(report: Report(m)).frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .fixedSize(horizontal: false, vertical: true)  // the video's height follows its width instead of the leftover space
+                        .padding([.horizontal, .top], 24).padding(.bottom, 12)
                         Divider()
                     }
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
                             let r = Report(m)
+                            if player == nil || relaunchMessage != nil || r.coverageNotice != nil || r.reliability != nil {  // an empty stack still takes the 24 pt spacing
                             VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text(m.title.isEmpty ? m.id : m.title).font(.largeTitle.bold()).lineLimit(1).truncationMode(.middle).help(m.title)
-                                    Spacer()
+                                if player == nil {  // otherwise it sits with the player's buttons
                                     Button("Relancer l'analyse") { Task { await relaunch(m.id) } }
                                         .disabled(notes.hasUnsaved)
                                         .help(notes.hasUnsaved ? "Enregistre ou abandonne tes notes avant de relancer l'analyse." : "")
                                 }
                                 if let msg = relaunchMessage { Text(msg).foregroundStyle(.secondary) }
-                                Text(m.view.label).foregroundStyle(.secondary)
                                 if let n = r.coverageNotice { Label(n, systemImage: "exclamationmark.triangle") }
                                 if let n = r.reliability { Text(n).monospacedDigit() }
                             }
-                            OverviewSection(report: r)
-                            BreakdownSection(report: r)
-                            AdviceSection(report: r) { player?.playClip(at: $0) }
+                            }
+                            if player == nil { OverviewSection(report: r) }
                             StrokesTable(strokes: m.strokes) { player?.playClip(at: $0) }
                         }
-                        .padding(24)
+                        .padding([.horizontal, .bottom], 24).padding(.top, player == nil ? 24 : 12)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }

@@ -38,20 +38,20 @@ struct StrokeTimeline: View {
             Canvas { ctx, sz in
                 for s in strokes {
                     let x = Timeline.x(s.t, duration: duration, width: sz.width)
-                    let r = CGRect(x: x - size / 2, y: 28 - size / 2, width: size, height: size)
+                    let r = CGRect(x: x - size / 2, y: 18 - size / 2, width: size, height: size)
                     ctx.fill(KindShape(kind: s.kind).path(in: r), with: .color(s.kind.color))
                     if s.t == cursor && focused { ctx.stroke(Path(ellipseIn: r.insetBy(dx: -4, dy: -4)), with: .color(.primary), lineWidth: 1.5) }
-                    if !s.defects.isEmpty { ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: 8, width: 6, height: 6)), with: .color(.red)) }
+                    if !s.defects.isEmpty { ctx.fill(Path(ellipseIn: CGRect(x: x - 3, y: 3, width: 6, height: 6)), with: .color(.red)) }
                 }
-                ctx.draw(Text("Mes notes").font(.caption2).foregroundStyle(.secondary), at: CGPoint(x: 2, y: 46), anchor: .leading)
+                if !notes.isEmpty { ctx.draw(Text("Mes notes").font(.caption2).foregroundStyle(.secondary), at: CGPoint(x: 2, y: 36), anchor: .leading) }
                 for n in notes {
                     let x = Timeline.x(n.t, duration: duration, width: sz.width)
-                    ctx.fill(KindShape(kind: n.kind).path(in: CGRect(x: x - size / 2, y: 66 - size / 2, width: size, height: size)), with: .color(n.kind.color))
+                    ctx.fill(KindShape(kind: n.kind).path(in: CGRect(x: x - size / 2, y: 50 - size / 2, width: size, height: size)), with: .color(n.kind.color))
                 }
                 let px = Timeline.x(model.currentTime, duration: duration, width: sz.width)
                 ctx.stroke(Path { $0.move(to: CGPoint(x: px, y: 0)); $0.addLine(to: CGPoint(x: px, y: sz.height)) }, with: .color(.primary), lineWidth: 1)
             }
-            .frame(height: 80)
+            .frame(height: notes.isEmpty ? 30 : 60)  // the notes row only when there are notes
             .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
             .overlay { GeometryReader { geo in Color.clear
                 .contentShape(Rectangle())

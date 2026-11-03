@@ -6,6 +6,7 @@ struct PlayerView: View {
     let model: PlayerModel
     let notes: NotesSession
     let api: APIClient
+    let onRelaunch: () -> Void
     @State private var leaving = false
     @State private var keyMonitor: Any?
     @State private var window: NSWindow?
@@ -19,8 +20,7 @@ struct PlayerView: View {
         VStack(alignment: .leading, spacing: 8) {
             PlayerSurface(player: model.player, pose: showSkeleton ? pose : nil,
                           videoSize: CGSize(width: match.info?.width ?? 0, height: match.info?.height ?? 0), fps: match.info?.fps ?? 0)
-                .frame(maxWidth: .infinity)
-                .containerRelativeFrame(.vertical) { h, _ in max(220, h * 0.4) }
+                .aspectRatio(match.info.map { $0.height > 0 ? Double($0.width) / Double($0.height) : 16 / 9 } ?? 16 / 9, contentMode: .fit)
             if match.strokes.isEmpty {
                 Text("Aucun coup détecté sur ce match.").foregroundStyle(.secondary)
             } else {
@@ -42,22 +42,26 @@ struct PlayerView: View {
 
     @ViewBuilder private var controls: some View {
         HStack {
-            Button(notes.active ? "Quitter la notation" : "Noter mes coups") {
+            Button(notes.active ? "Quitter la notation" : "Noter mes coups", systemImage: notes.active ? "xmark" : "pencil") {
                 if !notes.active { notes.start() }
                 else if notes.hasUnsaved { leaving = true }
                 else { notes.discard() }
             }
             .disabled(notes.loadError != nil)
             if notes.active {
-                Button("Enregistrer les notes") { Task { await notes.save(api) } }.disabled(notes.saving || !notes.recorder.hasUnsaved || notes.recorder.notes.isEmpty)
+                Button("Enregistrer les notes", systemImage: "square.and.arrow.down") { Task { await notes.save(api) } }.disabled(notes.saving || !notes.recorder.hasUnsaved || notes.recorder.notes.isEmpty)
                 Text(notes.recorder.countLabel).monospacedDigit()
             }
-            Button(showSkeleton ? "Masquer le squelette" : "Afficher le squelette") { showSkeleton.toggle() }
+            Button(showSkeleton ? "Masquer le squelette" : "Afficher le squelette", systemImage: "figure.walk") { showSkeleton.toggle() }
             if let e = notes.loadError { Text(e).foregroundStyle(.red) }
             if notes.saving { ProgressView().controlSize(.small); Text("Enregistrement…") }
             else if let m = notes.message { Text(m).foregroundStyle(.secondary).monospacedDigit() }
             if poseLoading { ProgressView().controlSize(.small); Text("Chargement du squelette…") }
             if let e = poseError { Text(e).foregroundStyle(.red) }
+            Spacer()
+            Button("Relancer l'analyse", systemImage: "arrow.clockwise", action: onRelaunch)
+                .disabled(notes.hasUnsaved)
+                .help(notes.hasUnsaved ? "Enregistre ou abandonne tes notes avant de relancer l'analyse." : "")
         }
         if notes.active {
             Text("Appuie sur D (coup droit), R (revers), S (service) ou A (autre) à chaque coup. ⌫ annule la dernière note, espace lance ou met en pause la vidéo.")
