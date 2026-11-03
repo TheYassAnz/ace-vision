@@ -150,6 +150,7 @@ struct LibraryView: View {
                     Text(dayText(d))
                 }
                 Text(m.view.label)
+                if let s = m.durationS { Text(clock(s)) }
             }.font(.caption).foregroundStyle(.secondary)
             if m.status == .running {
                 ProgressView(value: m.progress)
